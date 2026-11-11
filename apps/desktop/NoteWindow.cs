@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -43,9 +43,6 @@ namespace StickyCanvas
             Content = new Border { BorderBrush = UI.Line, BorderThickness = new Thickness(1), Child = outer };
             var header = new DockPanel { Background = UI.Brush("#FFF7E7A0"), LastChildFill = true, Height = 36 };
             DockPanel.SetDock(header, Dock.Top); dock.Children.Add(header);
-            var drag = new TextBlock { Text = "⠿", FontSize = 22, Width = 27, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.SizeAll, ToolTip = "메모 창 이동" };
-            DockPanel.SetDock(drag, Dock.Left); header.Children.Add(drag);
-            drag.MouseLeftButtonDown += delegate { EndEditing(); if (Mouse.LeftButton == MouseButtonState.Pressed) DragMove(); };
             var close = UI.Button("×", Close, "이 메모 숨기기 — 트레이에서 계속 실행"); DockPanel.SetDock(close, Dock.Right); header.Children.Add(close);
             var more = UI.Button("⋯", delegate { MoreMenu(); }, "메모 설정"); DockPanel.SetDock(more, Dock.Right); header.Children.Add(more);
             pin = UI.Button("고정", delegate { View.AlwaysOnTop = !View.AlwaysOnTop; Topmost = View.AlwaysOnTop; UpdatePin(); MarkDirty(false); }, "다른 창 위에 고정 / 해제"); DockPanel.SetDock(pin, Dock.Right); header.Children.Add(pin);
@@ -85,7 +82,7 @@ namespace StickyCanvas
                 bool before = View.IsOpen; View.IsOpen = false;
                 try { App.Store.Save(Model, View); } catch (Exception ex) { View.IsOpen = before; e.Cancel = true; MemoApp.Error(ex); }
             };
-            Closed += delegate { saveTimer.Stop(); hideChromeTimer.Stop(); ActiveText = null; views.Clear(); Paper.Children.Clear(); };
+            Closed += delegate { saveTimer.Stop(); ActiveText = null; views.Clear(); Paper.Children.Clear(); };
             PreviewKeyDown += Keys;
             if (app.UiTestMode) PreviewMouseDown += delegate(object sender, MouseButtonEventArgs e) {
                 var point = e.GetPosition(this); var hit = InputHitTest(point) as DependencyObject;
@@ -179,7 +176,7 @@ namespace StickyCanvas
         {
             if (loading || App.Quitting || trashed) return;
             if (!dirty) firstChange = DateTime.UtcNow; lastChange = DateTime.UtcNow; dirty = true; contentDirty |= content;
-            status.Content = "저장 중…"; status.Foreground = UI.Muted; saveTimer.Start();
+            status.Content = "저장 중…"; status.Foreground = ChromeForeground; saveTimer.Start();
         }
         public bool Flush(bool alert)
         {
@@ -192,7 +189,7 @@ namespace StickyCanvas
                 if (contentDirty) { Rules.Validate(Model); history.Record(Model); Model.Revision++; Model.UpdatedAt = DateTime.UtcNow.ToString("o"); }
                 if (WindowState == WindowState.Normal) { View.Left = Left; View.Top = Top; View.Width = Width; View.Height = Height; }
                 App.Store.Save(Model, View); dirty = false; contentDirty = false;
-                status.Content = "로컬 저장됨"; status.Foreground = UI.Muted; saveFailed = false; RefreshChrome(); App.RefreshLibrary(); App.MaybeRecovery(); return true;
+                status.Content = "로컬 저장됨"; status.Foreground = ChromeForeground; saveFailed = false; RefreshChrome(); App.RefreshLibrary(); App.MaybeRecovery(); return true;
             }
             catch (Exception ex)
             {
@@ -311,7 +308,6 @@ namespace StickyCanvas
             Action<string, Action> add = delegate(string label, Action action) { var m = new MenuItem { Header = label }; m.Click += delegate { action(); }; menu.Items.Add(m); };
             add("새 메모", App.NewNote); add("메모 목록", App.ShowLibrary);
             add("도구 고정 표시: " + (View.UiPinned ? "켜짐" : "꺼짐"), delegate { SetUiPinned(!View.UiPinned); });
-            add("마우스 오버 표시: " + (View.HoverUi == "off" ? "꺼짐" : "켜짐"), delegate { View.HoverUi = View.HoverUi == "off" ? "on" : "off"; RefreshChrome(); MarkDirty(false); });
             add("Windows 로그인 시 자동 실행: " + (App.IsAutoStartEnabled ? "켜짐" : "꺼짐"), App.ToggleAutoStart);
             add("메모 배경색…", delegate { PickColor(Model.Background, c => Edit(delegate { Model.Background = c; })); });
             add("종이 크기 변경…", delegate { double w, h; if (PropertyDialog.PaperSize(this, Model.PaperWidth, Model.PaperHeight, out w, out h)) Edit(delegate { Model.PaperWidth = w; Model.PaperHeight = h; }); });

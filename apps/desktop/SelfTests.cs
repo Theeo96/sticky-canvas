@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -149,15 +149,35 @@ namespace StickyCanvas
                         Assert(v.Model.PlainText.Contains("실제 편집 모델 😀"), "Native text edit");
                         Assert(other == Json.Write(window.Model.Elements.Where(e => e.Id != v.Model.Id).ToList()), "Text edit changed layout/other elements"); window.EndEditing();
                     });
-                    test("hover reveal and pinned UI coexist without changing document geometry", delegate {
-                        window.SetInkTool("select"); window.EndEditing(); window.NotifyHover(false); window.SetUiPinned(false);
-                        string original = Json.Write(window.Model); Assert(!window.ControlsVisible, "Idle chrome visible");
-                        window.SetUiPinned(true); Assert(window.ControlsVisible, "Pinned chrome hidden");
-                        window.SetUiPinned(false); Assert(!window.ControlsVisible, "Unpin should immediately hide");
-                        window.NotifyHover(false); window.NotifyHover(true); Assert(window.ControlsVisible, "Hover did not reveal chrome");
-                        window.View.HoverUi = "off"; window.NotifyHover(false); window.NotifyHover(true); Assert(!window.ControlsVisible, "Hover disabled ignored"); window.View.HoverUi = null;
-                        window.SetUiPinned(true); window.NotifyHover(false); Assert(window.ControlsVisible, "Mouse leave overrode pin");
-                        Assert(original == Json.Write(window.Model), "Chrome toggling changed document");
+                    test("toggle overlay preserves physical paper position and fit scale", delegate {
+                        window.SetInkTool("select"); window.EndEditing(); window.SetUiPinned(false);
+                        window.View.Fit = true; window.Render(); window.UpdateLayout();
+                        string original = Json.Write(window.Model);
+                        var origin = window.Paper.TranslatePoint(new Point(0, 0), window);
+                        var scale = window.Paper.LayoutTransform.Value;
+                        for (int i = 0; i < 4; i++) {
+                            window.SetUiPinned(i % 2 == 0); window.UpdateLayout();
+                            Assert(window.ControlsVisible == (i % 2 == 0), "Toggle state");
+                            Assert(window.Paper.TranslatePoint(new Point(0, 0), window) == origin && window.Paper.LayoutTransform.Value == scale, "Overlay changed physical paper geometry");
+                        }
+                        window.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseEnterEvent });
+                        Assert(!window.ControlsVisible, "Hover revealed tools");
+                        window.SetInkTool("pen"); Assert(!window.ControlsVisible, "Ink forced UI open"); window.SetInkTool("select");
+                        Assert(original == Json.Write(window.Model), "Chrome changed document");
+                    });
+                    test("adaptive contrast and title editing preserve note content", delegate {
+                        foreach (string color in new[] { "#FF000000", "#FFFFFFFF", "#FF202040", "#FFFFE58A", "#FF777777" }) {
+                            var bg = (Color)ColorConverter.ConvertFromString(color); var fg = NoteWindow.ForegroundFor(bg);
+                            double x = NoteWindow.Luminance(bg), y = NoteWindow.Luminance(fg);
+                            Assert((Math.Max(x, y) + .05) / (Math.Min(x, y) + .05) >= 4.5, "Insufficient text contrast");
+                            string content = Json.Write(window.Model.Elements);
+                            window.Model.Background = color; window.Render(); window.UpdateLayout();
+                            Assert(((SolidColorBrush)window.ChromeForeground).Color == fg, "Theme not applied");
+                            Assert(Json.Write(window.Model.Elements) == content, "Theme recolored note text");
+                        }
+                        Assert(!window.TitleEditing, "Title starts in editing mode");
+                        window.BeginTitleEdit(); Assert(window.TitleEditing, "Title edit did not start");
+                        window.FinishTitleEdit(); Assert(!window.TitleEditing, "Title edit did not finish");
                     });
                     test("pen stroke JSON, hit-test eraser, undo and backup preserve text and images", delegate {
                         string original = Json.Write(window.Model.Elements);
@@ -170,15 +190,15 @@ namespace StickyCanvas
                         window.Undo(); Assert(window.Model.Elements.Last().Type == "stroke", "Undo eraser");
                         window.Flush(false); string path = Path.Combine(root, "ink.zip"); app.Store.Export(path);
                         var copies = app.Store.Import(path); Assert(copies.Single().Elements.Last().Points.Count == saved.Elements.Last().Points.Count, "Ink backup loss");
-                        window.SetInkTool("pen"); Assert(window.InkTool == "pen" && window.ControlsVisible, "Pen mode presentation"); window.SetInkTool("select");
+                        window.SetInkTool("pen"); Assert(window.InkTool == "pen" && !window.ControlsVisible, "Pen mode presentation"); window.SetInkTool("select");
                     });
-                    test("hidden-UI save failure reveals retry status and successful retry restores reading mode", delegate {
-                        window.EndEditing(); window.NotifyHover(false); window.SetUiPinned(false); window.Flush(false);
+                    test("hidden-UI save failure shows retry badge without forcing tools open", delegate {
+                        window.EndEditing(); window.SetUiPinned(false); window.Flush(false);
                         using (var blocker = new Sqlite(Path.Combine(app.Store.Root, "notes.sqlite3")))
                         {
-                            blocker.Execute("BEGIN IMMEDIATE"); window.MarkDirty(); Assert(!window.Flush(false) && window.ControlsVisible, "Failure hidden from reader"); blocker.Execute("ROLLBACK");
+                            blocker.Execute("BEGIN IMMEDIATE"); window.MarkDirty(); Assert(!window.Flush(false) && window.SaveWarningVisible && !window.ControlsVisible, "Failure hidden from reader"); blocker.Execute("ROLLBACK");
                         }
-                        Assert(window.Flush(false) && !window.ControlsVisible, "Retry or reading-mode recovery failed");
+                        Assert(window.Flush(false) && !window.ControlsVisible && !window.SaveWarningVisible, "Retry or reading-mode recovery failed");
                     });
                     test("top toolbar and disclosure indicator; object insertion exits ink modes", delegate {
                         Assert(window.ToolsAtTop, "Toolbar should be at top");

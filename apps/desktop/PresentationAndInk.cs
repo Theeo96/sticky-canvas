@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Windows;
@@ -12,61 +12,50 @@ namespace StickyCanvas
 {
     public sealed partial class NoteWindow
     {
-        readonly DispatcherTimer hideChromeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
         DockPanel chromePanel;
-        Button chromeToggle;
-        bool presentationHover, suppressHover, saveFailed;
-        int openMenus;
+        Button chromeToggle, saveAlert;
+        bool saveFailed;
         string inkTool = "select";
         InkCanvas inkLayer;
         public bool ControlsVisible { get; private set; }
+        public bool SaveWarningVisible { get { return saveAlert != null && saveAlert.Visibility == Visibility.Visible; } }
         public string InkTool { get { return inkTool; } }
         void InitializePresentation(Grid root, DockPanel panel, DockPanel header)
         {
-            chromePanel = panel; chromePanel.VerticalAlignment = VerticalAlignment.Top; header.Margin = new Thickness(27, 0, 0, 0);
-            chromePanel.Background = UI.Brush("#FFFFF9DF");
-            chromePanel.SizeChanged += delegate { UpdateChromeInset(); };
-            SizeChanged += delegate { UpdateChromeInset(); };
-            chromeToggle = UI.Button("☰", delegate { SetUiPinned(!View.UiPinned); }, "도구 고정 표시 / 숨기기 · 마우스 오버로도 표시");
+            chromePanel = panel; chromePanel.VerticalAlignment = VerticalAlignment.Top;
+            header.Margin = new Thickness(27, 0, 0, 0);
+            chromeToggle = UI.Button("☰", delegate { SetUiPinned(!View.UiPinned); }, "상단 도구 표시 / 숨기기");
             chromeToggle.Width = 23; chromeToggle.Height = 23; chromeToggle.MinHeight = 23;
             chromeToggle.Padding = new Thickness(0); chromeToggle.Margin = new Thickness(2);
             chromeToggle.HorizontalAlignment = HorizontalAlignment.Left; chromeToggle.VerticalAlignment = VerticalAlignment.Top;
             root.Children.Add(chromeToggle);
-            MouseEnter += delegate { hideChromeTimer.Stop(); suppressHover = false; NotifyHover(true); };
-            MouseLeave += delegate { hideChromeTimer.Stop(); hideChromeTimer.Start(); };
-            hideChromeTimer.Tick += delegate { hideChromeTimer.Stop(); if (!IsMouseOver && !IsMouseCaptureWithin) NotifyHover(false); };
-            Deactivated += delegate { if (!IsMouseOver) NotifyHover(false); };
-            LostMouseCapture += delegate { if (!IsMouseOver) NotifyHover(false); };
+            saveAlert = UI.Button("저장 실패 · 재시도", delegate { Flush(true); }, "저장하지 못했습니다. 클릭해 재시도하세요.");
+            saveAlert.HorizontalAlignment = HorizontalAlignment.Right; saveAlert.VerticalAlignment = VerticalAlignment.Bottom;
+            root.Children.Add(saveAlert);
+            InitializeHeaderDrag(header);
         }
-        public void NotifyHover(bool value) { if (value && !presentationHover) suppressHover = false; presentationHover = value; RefreshChrome(); }
         public void SetUiPinned(bool value)
         {
-            View.UiPinned = value; suppressHover = !value; RefreshChrome(); MarkDirty(false);
+            View.UiPinned = value; if (!value) FinishTitleEdit(); RefreshChrome(); MarkDirty(false);
         }
         public void TrackMenu(ContextMenu menu)
         {
-            menu.Opened += delegate { openMenus++; RefreshChrome(); };
-            menu.Closed += delegate { openMenus = Math.Max(0, openMenus - 1); if (!IsMouseOver) NotifyHover(false); else RefreshChrome(); };
+            menu.Opened += delegate { ApplyMenuTheme(menu); };
         }
         void RefreshChrome()
         {
             if (chromePanel == null) return;
-            ControlsVisible = View.UiPinned || (presentationHover && View.HoverUi != "off" && !suppressHover) || openMenus > 0 || inkTool != "select" || saveFailed;
+            ControlsVisible = View.UiPinned;
             chromePanel.Visibility = ControlsVisible ? Visibility.Visible : Visibility.Collapsed;
-            chromeToggle.Content = View.UiPinned ? "▣" : "☰";
-            chromeToggle.Opacity = ControlsVisible ? 1 : .45;
-            scroll.HorizontalScrollBarVisibility = ControlsVisible ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
-            scroll.VerticalScrollBarVisibility = ControlsVisible ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
+            chromeToggle.Content = ControlsVisible ? "▣" : "☰";
+            chromeToggle.Opacity = 1;
+            saveAlert.Visibility = saveFailed && !ControlsVisible ? Visibility.Visible : Visibility.Collapsed;
+            // Overlay controls never change the paper viewport, offsets or fit scale.
+            scroll.Margin = new Thickness(0);
+            scroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
+            scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
             if (Selected != null) Selected.SetSelected(ControlsVisible);
-            if (ActiveText != null && ActiveText.Editor != null) ActiveText.Editor.VerticalScrollBarVisibility = ControlsVisible ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
-            UpdateChromeInset();
-        }
-        void UpdateChromeInset()
-        {
-            if (chromePanel == null) return;
-            double height = ControlsVisible ? Math.Min(chromePanel.ActualHeight, Math.Max(0, ActualHeight - 80)) : 0;
-            var margin = new Thickness(0, height, 0, 0);
-            if (scroll.Margin != margin) scroll.Margin = margin;
+            ApplyChromeTheme();
         }
         void BuildInkTools(WrapPanel toolbar)
         {

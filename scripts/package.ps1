@@ -1,20 +1,20 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path $PSScriptRoot -Parent
-$taskRelease = Join-Path $taskRoot 'release\0.3.0'
+$taskRelease = Join-Path $taskRoot 'release\0.4.0'
 New-Item -ItemType Directory -Path $taskRelease -Force | Out-Null
 foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config')) {
     Copy-Item -LiteralPath (Join-Path (Join-Path $taskRoot 'bin') $taskName) -Destination (Join-Path $taskRelease $taskName) -Force
 }
 $taskGuide = @'
-캔버스 메모 v0.3.0 — Windows x64
+캔버스 메모 v0.4.0 — Windows x64
 
 평소에는 내용과 좌상단 작은 ☰ 버튼만 보입니다.
-마우스를 올리면 상단에 도구가 나타나며, 벗어나면 숨습니다.
-☰ 버튼은 도구 고정 표시/해제입니다. 해제하면 즉시 내용만 보입니다.
-⋯ 메뉴에서 마우스 오버 표시를 끌 수 있습니다. 내용 위치는 움직이지 않습니다.
+좌상단 ☰ 버튼을 누를 때마다 상단 도구를 표시/숨깁니다.
+도구는 내용 위에 겹쳐 표시됩니다. 내용 위치와 배율은 변하지 않습니다.
+도구 배경은 메모 배경색과 같으며 글자색은 대비에 따라 검정/흰색으로 자동 조절됩니다.
 글상자·도형·이미지·서식을 누르면 펜/지우개 모드가 자동 종료됩니다. 서식 ▾/▴는 펼침 상태를 나타냅니다.
 배치 ▾에서 종이 기준 정렬과 이동 시 8칸 격자 맞춤을 사용할 수 있습니다.
-펜/지우개 모드에서는 도구가 유지됩니다. 선택 또는 Esc로 종료합니다.
+펜/지우개 모드에서도 도구를 숨길 수 있습니다. 선택 또는 Esc로 그리기를 종료합니다.
 펜 색·굵기, 선 전체 지우기, 필기 이동·크기 조절·실행 취소·저장을 지원합니다.
 필기를 넣은 메모는 문서 버전 2가 되어 v0.1.0에서 열 수 없습니다.
 
@@ -24,7 +24,7 @@ $taskGuide = @'
 트레이 우클릭: 새 메모 / 보이기·숨기기 / 백업 / 데이터 폴더 / 완전 종료.
 모든 창을 닫아도 계속 실행됩니다. 종료는 트레이 우클릭 → 캔버스 메모 종료.
 
-창 이동: 왼쪽 위 ⠿. 창 크기: 테두리/모서리.
+창 이동: 상단 제목 표시줄 드래그. 제목 더블클릭: 편집. Enter/Esc/다른 곳 클릭: 편집 마침. 창 크기: 테두리/모서리.
 글상자 편집: 더블클릭 또는 선택 후 Enter.
 요소 이동: 클릭 후 위쪽 파란 손잡이 드래그. 크기: 선택 모서리.
 Aa 서식: 글꼴·크기·굵게·기울임·밑줄·색·정렬.
@@ -58,7 +58,7 @@ New-Item -ItemType Directory -Path $taskCurrent -Force | Out-Null
 foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config','사용안내.txt')) {
     Copy-Item -LiteralPath (Join-Path $taskRelease $taskName) -Destination (Join-Path $taskCurrent $taskName) -Force
 }
-$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.3.0.zip'
+$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.4.0.zip'
 Compress-Archive -LiteralPath @((Join-Path $taskRelease 'StickyCanvas.exe'),(Join-Path $taskRelease 'StickyCanvas.exe.config'),(Join-Path $taskRelease '사용안내.txt')) -DestinationPath $taskZip -Force
 Get-FileHash -LiteralPath (Join-Path $taskRelease 'StickyCanvas.exe') -Algorithm SHA256 | Select-Object Path,Hash
 Get-Item -LiteralPath $taskZip | Select-Object FullName,Length

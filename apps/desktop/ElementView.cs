@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -114,7 +114,7 @@ namespace StickyCanvas
         {
             if (Model.Type != "text" || Editor != null) return;
             owner.EndEditing(); owner.Record(); owner.Select(this); body.Children.Clear();
-            Editor = new RichTextBox { Document = TextCodec.Document(Model), BorderThickness = new Thickness(Model.StrokeWidth), BorderBrush = UI.Brush(Model.Stroke), Background = UI.Brush(Model.Fill), Padding = new Thickness(Model.Padding), IsUndoEnabled = false, AcceptsTab = true, VerticalScrollBarVisibility = owner.ControlsVisible ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            Editor = new RichTextBox { Document = TextCodec.Document(Model), BorderThickness = new Thickness(Model.StrokeWidth), BorderBrush = UI.Brush(Model.Stroke), Background = UI.Brush(Model.Fill), Padding = new Thickness(Model.Padding), IsUndoEnabled = false, AcceptsTab = true, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             System.Windows.Automation.AutomationProperties.SetName(Editor, "메모 글상자 편집");
             SpellCheck.SetIsEnabled(Editor, false); body.Children.Add(Editor); owner.ActiveText = this;
             Editor.Loaded += delegate { if (Editor != null) { Editor.Focus(); Keyboard.Focus(Editor); FocusManager.SetFocusedElement(owner, Editor); } };

@@ -1,4 +1,4 @@
-# 개발 안내
+﻿# 개발 안내
 
 Windows x64 / .NET Framework 4.8. 소스는 `apps/desktop/`입니다.
 
@@ -8,6 +8,7 @@ Windows x64 / .NET Framework 4.8. 소스는 `apps/desktop/`입니다.
 | Store.cs / Sqlite.cs | 저장·첨부·백업, OS SQLite C API |
 | NoteWindow.cs / ElementView.cs | 편집·표시 |
 | PresentationAndInk.cs | 내용만 보기·도구 표시·필기 |
+| NoteChrome.cs | 자동 대비·도구 테마·제목 표시줄 이동 |
 | Placement.cs | 서식 펼침 표시·정렬·격자 |
 | Program.cs | 트레이·수명·자동 실행 |
 
