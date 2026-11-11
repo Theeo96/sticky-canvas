@@ -24,6 +24,9 @@ namespace StickyCanvas
         void InitializePresentation(Grid root, DockPanel panel, DockPanel header)
         {
             chromePanel = panel; chromePanel.VerticalAlignment = VerticalAlignment.Top; header.Margin = new Thickness(27, 0, 0, 0);
+            chromePanel.Background = UI.Brush("#FFFFF9DF");
+            chromePanel.SizeChanged += delegate { UpdateChromeInset(); };
+            SizeChanged += delegate { UpdateChromeInset(); };
             chromeToggle = UI.Button("☰", delegate { SetUiPinned(!View.UiPinned); }, "도구 고정 표시 / 숨기기 · 마우스 오버로도 표시");
             chromeToggle.Width = 23; chromeToggle.Height = 23; chromeToggle.MinHeight = 23;
             chromeToggle.Padding = new Thickness(0); chromeToggle.Margin = new Thickness(2);
@@ -56,6 +59,14 @@ namespace StickyCanvas
             scroll.VerticalScrollBarVisibility = ControlsVisible ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
             if (Selected != null) Selected.SetSelected(ControlsVisible);
             if (ActiveText != null && ActiveText.Editor != null) ActiveText.Editor.VerticalScrollBarVisibility = ControlsVisible ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
+            UpdateChromeInset();
+        }
+        void UpdateChromeInset()
+        {
+            if (chromePanel == null) return;
+            double height = ControlsVisible ? Math.Min(chromePanel.ActualHeight, Math.Max(0, ActualHeight - 80)) : 0;
+            var margin = new Thickness(0, height, 0, 0);
+            if (scroll.Margin != margin) scroll.Margin = margin;
         }
         void BuildInkTools(WrapPanel toolbar)
         {
