@@ -322,6 +322,15 @@ namespace StickyCanvas
                         bool rejected=false;try{window.SetNoteOpacity(0);}catch{rejected=true;}Assert(rejected,"Invisible window allowed");
                         var old=Json.Read<NoteView>("{\"Left\":100,\"Top\":100,\"Width\":540,\"Height\":460,\"Zoom\":1}");Assert(!old.WindowOpacity.HasValue,"Legacy default opacity");Rules.Validate(old);
                     });
+                    test("800 percent zoom persists and pen locator preserves true brush footprint",delegate {
+                        window.View.PenWidth=1;window.ZoomAt(100,new Point(150,150));Assert(window.View.Zoom==8 && window.Paper.LayoutTransform.Value.M11==8,"Zoom upper limit");
+                        Assert(window.PenPointerDiameter==8 && window.PenLocatorDiameter>=20,"Thin pen marker at 800 percent");window.ZoomAt(2,new Point(150,150));Assert(window.View.Zoom==8,"Zoom exceeded limit");
+                        window.SetInkTool("pen");Assert(window.Paper.Cursor==System.Windows.Input.Cursors.None,"Default pen cursor not hidden");
+                        window.Flush(false);var view=app.Store.View(window.Model.Id);Assert(view.Zoom==8,"800 percent not saved");view.BasicZoom=8;view.FlowZoom=8;Rules.Validate(view);
+                        window.View.PenWidth=64;Assert(window.PenPointerDiameter==512 && window.PenLocatorDiameter>512,"Large pen preview clipped to fixed cursor size");
+                        window.ZoomAt(.125,new Point(150,150));window.View.PenWidth=1;Assert(window.PenPointerDiameter==1 && window.PenLocatorDiameter>=20,"One-pixel locator");window.SetInkTool("select");Assert(window.Paper.Cursor==System.Windows.Input.Cursors.Arrow,"Selection cursor not restored");
+                        string before=Json.Write(window.Model);window.ToggleFlow();window.ToggleFlow();Assert(Json.Write(window.Model)==before,"Zoom changed note content");
+                    });
                     window.Close();
                     Assert(app.Store.View(n.Id).IsOpen == false, "Close should hide persisted note"); Assert(app.Store.Load().Any(a => a.Id == n.Id), "Close deleted note");
                 }

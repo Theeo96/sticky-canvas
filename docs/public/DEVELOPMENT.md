@@ -33,3 +33,6 @@ PenColor.cs는 펜 색상 견본과 메모 내부 색 추출을 담당합니다.
 
 
 NoteAppearance.cs는 펜 필기를 제외한 찾기 목록과 창 전체 불투명도를 관리합니다. WPF AllowsTransparency와 Window.Opacity를 사용하며 소스 초기화 전에 투명 창 옵션을 설정합니다. 본문 데이터와 창 보기 설정을 구분합니다.
+
+
+PenPointer.cs는 메모 밖의 루트 오버레이에 펜 실제 크기·위치 원을 그립니다. InkCanvas 기본 커서는 UseCustomCursor/Cursors.None으로 비활성화하며, 오버레이는 입력을 받지 않습니다. PenPointerDiameter는 문서 굵기×배율(DIP)이고 Locator는 최소20DIP입니다. 스포이드 캡처 대상인 Paper의 자식이 아닙니다.

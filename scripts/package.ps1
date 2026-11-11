@@ -5,13 +5,13 @@ if (-not $SkipCurrent) {
     $taskRunning = @(Get-Process StickyCanvas -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $taskRoot 'release\current\StickyCanvas.exe') })
     if ($taskRunning.Count) { throw 'Exit StickyCanvas through its tray menu before updating current, or use -SkipCurrent for a versioned package only.' }
 }
-$taskRelease = Join-Path $taskRoot 'release\0.7.2'
+$taskRelease = Join-Path $taskRoot 'release\0.7.3'
 New-Item -ItemType Directory -Path $taskRelease -Force | Out-Null
 foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config')) {
     Copy-Item -LiteralPath (Join-Path (Join-Path $taskRoot 'bin') $taskName) -Destination (Join-Path $taskRelease $taskName) -Force
 }
 $taskGuide = @'
-캔버스 메모 v0.7.2 — Windows x64
+캔버스 메모 v0.7.3 — Windows x64
 
 평소에는 내용과 좌상단 작은 ☰ 버튼만 보입니다.
 좌상단 ☰ 버튼을 누를 때마다 상단 도구를 표시/숨깁니다.
@@ -71,13 +71,17 @@ v0.6: 선택 전체 테두리 모서리로 비율 유지 크기 조절 (글자·
 펜/지우개 슬라이더와 원형 미리보기, px 수치를 제공합니다. 원형 미리보기는 최대 32px입니다.
 기존 벡터 필기는 지우개 사용 시 픽셀로 전환됩니다. 실행 취소로 복원할 수 있습니다.
 
-v0.7.2: 펜 색 버튼의 견본에 현재 색상이 표시됩니다.
+v0.7.3: 펜 색 버튼의 견본에 현재 색상이 표시됩니다.
 옆의 스포이드 → 메모 안의 색 클릭 → 해당 색의 펜으로 복귀. Esc/우클릭으로 취소.
 선택 손잡이를 제외한 화면 합성 색을 사용합니다. 앱 밖 화면은 채취하지 않습니다.
 
-v0.7.2: ⋯ → 요소 선택/가려진 요소 찾기에서 펜 필기를 제외합니다. 본문은 그대로 유지합니다.
+v0.7.3: ⋯ → 요소 선택/가려진 요소 찾기에서 펜 필기를 제외합니다. 본문은 그대로 유지합니다.
 ⋯ → 메모 전체 불투명도: 슬라이더 20~100%, 창 전체에 적용하고 메모별로 기억합니다.
 100% 버튼으로 원래 상태 복원. 이미지 자체의 불투명도와는 별도 설정입니다.
+
+v0.7.3: 최대 확대 800%. Flow 휠 / 기본 Ctrl+휠 조작은 동일합니다.
+펜 포인터는 실제 굵기 표시와 최소 20px 빈 원으로 위치를 표시합니다. 큰 펜은 윤곽 표시.
+커서는 저장 데이터·이미지·스포이드 채취에 포함되지 않습니다.
 
 상세 기획·사용 안내·검증 기록은 원래 프로젝트 폴더의 docs/를 참고하세요.
 문제가 생기면 저장 실패 표시 여부와 했던 조작을 알려주세요. 원본 데이터 폴더는 먼저 보존하세요.
@@ -90,7 +94,7 @@ foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config','사용안�
     Copy-Item -LiteralPath (Join-Path $taskRelease $taskName) -Destination (Join-Path $taskCurrent $taskName) -Force
 }
 }
-$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.7.2.zip'
+$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.7.3.zip'
 Compress-Archive -LiteralPath @((Join-Path $taskRelease 'StickyCanvas.exe'),(Join-Path $taskRelease 'StickyCanvas.exe.config'),(Join-Path $taskRelease '사용안내.txt')) -DestinationPath $taskZip -Force
 Get-FileHash -LiteralPath (Join-Path $taskRelease 'StickyCanvas.exe') -Algorithm SHA256 | Select-Object Path,Hash
 Get-Item -LiteralPath $taskZip | Select-Object FullName,Length

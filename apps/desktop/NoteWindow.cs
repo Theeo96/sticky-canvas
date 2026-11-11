@@ -166,7 +166,7 @@ namespace StickyCanvas
         void ApplyZoom()
         {
             double zoom = View.Fit ? Math.Min(Math.Max(50, scroll.ViewportWidth) / Model.PaperWidth, Math.Max(50, scroll.ViewportHeight) / Model.PaperHeight) : View.Zoom;
-            zoom = Math.Max(.1, Math.Min(4, zoom)); Paper.LayoutTransform = new ScaleTransform(zoom, zoom); if(zoomButton != null) zoomButton.Content=View.Fit ? "전체 맞춤" : Math.Round(zoom*100)+"%";
+            zoom = Math.Max(.1, Math.Min(8, zoom)); Paper.LayoutTransform = new ScaleTransform(zoom, zoom); if(zoomButton != null) zoomButton.Content=View.Fit ? "전체 맞춤" : Math.Round(zoom*100)+"%";RefreshPenPointer();
         }
         public void Select(ElementView view)
         {

@@ -78,7 +78,7 @@ namespace StickyCanvas {
    flowButton.Content=View.Flow ? "Flow ●" : "Flow"; ApplyZoom();UpdateLayout();scroll.ScrollToHorizontalOffset(View.Flow ? View.FlowPanX : View.BasicPanX);scroll.ScrollToVerticalOffset(View.Flow ? View.FlowPanY : View.BasicPanY); MarkDirty(false);
   }
   public void ZoomAt(double factor, Point point) {
-   double old=Scale, zoom=Math.Max(.1,Math.Min(4,old*factor));
+   double old=Scale, zoom=Math.Max(.1,Math.Min(8,old*factor));
    double x=(scroll.HorizontalOffset+point.X-200)/old, y=(scroll.VerticalOffset+point.Y-200)/old;
    View.Fit=false; View.Zoom=zoom; ApplyZoom(); UpdateLayout();
    scroll.ScrollToHorizontalOffset(200+x*zoom-point.X); scroll.ScrollToVerticalOffset(200+y*zoom-point.Y); MarkDirty(false);

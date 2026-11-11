@@ -25,3 +25,6 @@ v0.6 문서 스키마 4는 Locked와 IsDrawing을 추가합니다. 픽셀 필기
 
 
 v0.7.2의 WindowOpacity는 NoteView에 저장하는 nullable 배율(0.2~1)입니다. 필드가 없으면 1(불투명)이며 문서 스키마 변경은 없습니다. 요소 찾기 필터는 stroke/IsDrawing을 제외할 뿐 문서에서 삭제하지 않습니다.
+
+
+v0.7.3은 NoteView의 Zoom/BasicZoom/FlowZoom 상한을 8로 늘립니다. 400%까지 지원하던 구버전에서는 800% 보기 설정을 읽지 못해 보기 설정이 초기화될 수 있습니다. 문서 좌표·요소 크기에는 영향이 없습니다.

@@ -33,6 +33,7 @@ namespace StickyCanvas
             saveAlert.HorizontalAlignment = HorizontalAlignment.Right; saveAlert.VerticalAlignment = VerticalAlignment.Bottom;
             root.Children.Add(saveAlert);
             InitializeHeaderDrag(header);
+            InitializePenPointer(root);
         }
         public void SetUiPinned(bool value)
         {
@@ -73,13 +74,13 @@ namespace StickyCanvas
         {
             if (tool != "select" && tool != "pen" && tool != "erase" && tool != "pick") throw new ArgumentException("Unknown tool");
             FinishPixelErase(); EndEditing(); Select(null); inkTool = tool; ConfigureInkOverlay(); RefreshChrome();
-            Paper.Cursor = tool == "pick" ? Cursors.Cross : tool == "select" ? Cursors.Arrow : Cursors.Pen;
-            RefreshPenColorSwatch();
+            Paper.Cursor = tool == "pick" ? Cursors.Cross : tool == "select" ? Cursors.Arrow : tool == "pen" ? Cursors.None : Cursors.Pen;
+            RefreshPenColorSwatch();RefreshPenPointer();
         }
         void ExitInkForObjectAction() { if (inkTool != "select") SetInkTool("select"); }
         void ConfigureInkAttributes()
         {
-            if (inkLayer == null) return;
+            RefreshPenPointer();if (inkLayer == null) return;
             double width = View.PenWidth > 0 ? View.PenWidth : 3;
             inkLayer.DefaultDrawingAttributes = new DrawingAttributes { Color = (Color)ColorConverter.ConvertFromString(View.PenColor ?? "#FF3E392F"), Width = width, Height = width, IgnorePressure = true, FitToCurve = false };
         }
@@ -89,6 +90,7 @@ namespace StickyCanvas
             inkLayer = null;
             if (inkTool != "pen") return;
             inkLayer = new InkCanvas { Width = Model.PaperWidth, Height = Model.PaperHeight, Background = Brushes.Transparent, ClipToBounds = true, EditingMode = InkCanvasEditingMode.Ink };
+            inkLayer.UseCustomCursor=true;inkLayer.Cursor=Cursors.None;
             ConfigureInkAttributes();
             inkLayer.StrokeCollected += delegate(object sender, InkCanvasStrokeCollectedEventArgs e) { CommitInk(e.Stroke); };
             Paper.Children.Add(inkLayer);
