@@ -291,6 +291,21 @@ namespace StickyCanvas
                         image=window.Model.Elements.First(e=>e.Id==id);window.BeginImageOpacity(image);window.PreviewImageOpacity(.6);Assert(window.Flush(false)&&!window.ImageEditing,"Save did not finalize preview");Assert(app.Store.Load().First(n=>n.Id==window.Model.Id).Elements.First(e=>e.Id==id).ImageOpacity==.6,"Saved preview mismatch");
                         window.Edit(delegate{image.Locked=true;});window.BeginImageCrop(image);Assert(!window.ImageEditing,"Locked image crop opened");
                     });
+                    test("pen swatch follows selected color and picker samples visible canvas without editing notes",delegate {
+                        window.SetPenColor("#FF247AC4");Assert(window.SwatchColor==Color.FromRgb(36,122,196)&&window.View.PenColor=="#FF247AC4","Swatch mismatch");
+                        window.Edit(delegate{window.Model.Background="#FF123456";window.Model.Elements.Clear();window.Model.Elements.Add(new Element{Type="rectangle",X=20,Y=20,Width=80,Height=80,Fill="#FFFF0000",StrokeWidth=0});});
+                        window.UpdateLayout();string before=Json.Write(window.Model);
+                        Assert(window.SamplePaperColor(new Point(150,150))==Color.FromRgb(18,52,86),"Background sample "+window.SamplePaperColor(new Point(150,150))+" scale="+window.Paper.LayoutTransform.Value+" size="+window.Paper.ActualWidth+","+window.Paper.ActualHeight);Assert(window.SamplePaperColor(new Point(50,50))==Colors.Red,"Shape sample");
+                        window.SelectAllElements();Assert(window.SamplePaperColor(new Point(20,20))==Colors.Red,"Selection handles contaminated sample");
+                        window.SetInkTool("pick");Assert(window.InkTool=="pick","Picker mode");window.SetInkTool("select");Assert(window.InkTool=="select","Picker cancel");Assert(Json.Write(window.Model)==before,"Picker changed document");
+                        window.Flush(false);Assert(app.Store.View(window.Model.Id).PenColor=="#FF247AC4","Pen color not persisted");
+                    });
+                    test("eyedropper samples composited images at zoom and returns to pen without drawing",delegate {
+                        window.ImportImage(Path.Combine(root,"editor-fixture.png"));var image=window.Selected.Model;window.Edit(delegate{image.X=200;image.Y=200;image.Width=64;image.Height=48;image.ImageOpacity=.5;});window.UpdateLayout();
+                        var color=window.SamplePaperColor(new Point(225,225));Assert(Math.Abs(color.R-119)<=2 && Math.Abs(color.G-106)<=2 && Math.Abs(color.B-73)<=2,"Composited image sample "+color);
+                        window.ZoomAt(.7,new Point(100,100));Assert(window.SamplePaperColor(new Point(225,225))==color,"Zoom changed sample");
+                        string before=Json.Write(window.Model);window.SetInkTool("pick");window.PickPenColorAt(new Point(225,225));Assert(window.InkTool=="pen"&&window.SwatchColor==color,"Picker did not return to colored pen");Assert(Json.Write(window.Model)==before,"Picking added a stroke");window.SetInkTool("select");
+                    });
                     window.Close();
                     Assert(app.Store.View(n.Id).IsOpen == false, "Close should hide persisted note"); Assert(app.Store.Load().Any(a => a.Id == n.Id), "Close deleted note");
                 }

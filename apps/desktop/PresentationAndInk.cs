@@ -62,7 +62,7 @@ namespace StickyCanvas
             toolbar.Children.Add(UI.Button("↖ 선택", delegate { SetInkTool("select"); }, "요소 선택 / 그리기 종료 (Esc)"));
             toolbar.Children.Add(UI.Button("✎ 펜", delegate { SetInkTool("pen"); }, "마우스·펜으로 손그림"));
             toolbar.Children.Add(UI.Button("▰ 지우개", delegate { SetInkTool("erase"); }, "픽셀 필기의 닿는 부분 지우기 — 글·사진·도형은 유지"));
-            toolbar.Children.Add(UI.Button("● 펜 색", delegate { PickColor(View.PenColor ?? "#FF3E392F", delegate(string c) { View.PenColor = c; ConfigureInkAttributes(); MarkDirty(false); }); }));
+            BuildPenColorTools(toolbar);
             BuildBrushSliders(toolbar);
             Paper.PreviewMouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e) { if (inkTool == "erase") { BeginPixelErase(); ErasePixelAt(e.GetPosition(Paper)); Paper.CaptureMouse(); e.Handled = true; } };
             Paper.PreviewMouseMove += delegate(object sender, MouseEventArgs e) { if (inkTool == "erase" && e.LeftButton == MouseButtonState.Pressed) { ErasePixelAt(e.GetPosition(Paper)); e.Handled = true; } };
@@ -71,9 +71,10 @@ namespace StickyCanvas
         }
         public void SetInkTool(string tool)
         {
-            if (tool != "select" && tool != "pen" && tool != "erase") throw new ArgumentException("Unknown tool");
+            if (tool != "select" && tool != "pen" && tool != "erase" && tool != "pick") throw new ArgumentException("Unknown tool");
             FinishPixelErase(); EndEditing(); Select(null); inkTool = tool; ConfigureInkOverlay(); RefreshChrome();
-            Paper.Cursor = tool == "select" ? Cursors.Arrow : Cursors.Pen;
+            Paper.Cursor = tool == "pick" ? Cursors.Cross : tool == "select" ? Cursors.Arrow : Cursors.Pen;
+            RefreshPenColorSwatch();
         }
         void ExitInkForObjectAction() { if (inkTool != "select") SetInkTool("select"); }
         void ConfigureInkAttributes()

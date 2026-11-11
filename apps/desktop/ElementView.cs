@@ -49,6 +49,7 @@ namespace StickyCanvas
             owner.TrackMenu(menu); ContextMenu = menu;
 
         }
+        public void ShowSelectionHandles(bool show){handles.Visibility=show?Visibility.Visible:Visibility.Hidden;}
         public void PreviewOpacity(double value) {foreach(var image in body.Children.OfType<Image>())image.Opacity=value;}
         public double DisplayedOpacity {get {var image=body.Children.OfType<Image>().FirstOrDefault();return image==null?1:image.Opacity;}}
         public void ShowPixelPreview(System.Windows.Media.Imaging.BitmapSource source) {body.Children.Clear();body.Children.Add(new Image{Source=source,Stretch=Stretch.Fill,IsHitTestVisible=false});}
