@@ -1,0 +1,16 @@
+bin/
+obj/
+.local/
+*.user
+*.pdb
+evidence/
+release/
+AGENTS.md
+docs/*
+!docs/public/
+*.sqlite3*
+*.db
+*.zip
+*.log
+*.key
+.env*

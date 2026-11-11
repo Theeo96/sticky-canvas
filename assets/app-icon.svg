@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>캔버스 메모</title>
+  <path fill="#F6D56F" d="M48 24h160a24 24 0 0 1 24 24v128l-56 56H48a24 24 0 0 1-24-24V48a24 24 0 0 1 24-24Z"/>
+  <path fill="#DCA947" d="M176 232v-40a16 16 0 0 1 16-16h40Z"/>
+  <rect x="66" y="80" width="124" height="14" rx="7" fill="#70582E"/>
+  <rect x="66" y="121" width="88" height="14" rx="7" fill="#70582E"/>
+</svg>
