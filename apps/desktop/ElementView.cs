@@ -20,7 +20,7 @@ namespace StickyCanvas
             Children.Add(body); Children.Add(handles); RefreshBody(); SetSelected(false); Layout();
             MouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e) {
                 if (Editor != null) { Editor.Focus(); Keyboard.Focus(Editor); return; }
-                owner.Select(this);
+                owner.SelectMany(this, (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
                 if (e.ClickCount == 2 && Model.Type == "text") BeginEdit();
                 e.Handled = true;
             };
@@ -31,6 +31,10 @@ namespace StickyCanvas
             add("앞으로", delegate { owner.Reorder(1); }); add("뒤로", delegate { owner.Reorder(-1); });
             add("맨 앞으로", delegate { owner.Reorder(10000); }); add("맨 뒤로", delegate { owner.Reorder(-10000); });
             add("복제", owner.Duplicate); add("삭제", owner.Delete);
+            if (Model.Type == "image") {
+                add("이미지 투명도·자르기…", delegate { owner.EditImage(Model); });
+                add("이미지 원상복구", delegate { owner.RestoreImage(Model); });
+            }
             if (Model.Type == "text") add("내용에 맞춰 높이 늘리기", owner.FitTextHeight);
             if (Model.Type == "line" || Model.Type == "arrow")
             {
@@ -60,7 +64,7 @@ namespace StickyCanvas
             }
             else if (Model.Type == "image")
             {
-                try { body.Children.Add(new Image { Source = owner.App.Store.Bitmap(Model.AssetId), Stretch = Stretch.Uniform, IsHitTestVisible = false }); }
+                try { body.Children.Add(new Image { Source = owner.ImageSource(Model), Opacity = Model.ImageOpacity ?? 1, Stretch = Stretch.Uniform, IsHitTestVisible = false }); }
                 catch { body.Children.Add(new TextBlock { Text = "이미지를 읽을 수 없습니다\n원본 데이터는 보존됩니다", TextWrapping = TextWrapping.Wrap, Foreground = UI.Muted, Background = UI.Brush("#FFF3E7D2") }); }
                 Background = Brushes.Transparent;
             }
@@ -83,14 +87,13 @@ namespace StickyCanvas
         {
             Point start = new Point(); double x = 0, y = 0, width = 0, height = 0;
             thumb.DragStarted += delegate {
-                owner.EndEditing(); owner.Record(); start = Mouse.GetPosition(owner.Paper); x = Model.X; y = Model.Y; width = Model.Width; height = Model.Height;
+                owner.EndEditing(); owner.Record(); start = Mouse.GetPosition(owner.Paper); owner.StartGroupDrag(Model); x = Model.X; y = Model.Y; width = Model.Width; height = Model.Height;
             };
             thumb.DragDelta += delegate {
                 var p = Mouse.GetPosition(owner.Paper); double dx = p.X - start.X, dy = p.Y - start.Y;
                 if (sideX == 0)
                 {
-                    Model.X = owner.SnapPosition(x + dx, owner.Model.PaperWidth - width);
-                    Model.Y = owner.SnapPosition(y + dy, owner.Model.PaperHeight - height);
+                    owner.MoveGroupDrag(Model, dx, dy);
                 }
                 else
                 {

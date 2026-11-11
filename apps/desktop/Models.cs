@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -35,6 +35,9 @@ namespace StickyCanvas
         [DataMember] public string Fill = "#00FFFFFF", Stroke = "#FF756744";
         [DataMember] public double StrokeWidth = 0, Padding = 6;
         [DataMember] public string AssetId = "";
+        [DataMember(EmitDefaultValue = false)] public string GroupId;
+        [DataMember(EmitDefaultValue = false)] public double? ImageOpacity;
+        [DataMember(EmitDefaultValue = false)] public double? CropX, CropY, CropWidth, CropHeight;
         [DataMember] public bool ReverseLine;
         [DataMember] public string LineOrientation = "horizontal";
         [DataMember(EmitDefaultValue = false)] public List<InkPoint> Points;
@@ -67,6 +70,10 @@ namespace StickyCanvas
         [DataMember] public bool IsOpen = true, AlwaysOnTop, Fit;
         [DataMember] public bool UiPinned;
         [DataMember] public bool SnapGrid;
+        [DataMember] public bool Flow;
+        [DataMember] public double PanX, PanY, BasicZoom = 1, FlowZoom;
+        [DataMember] public double BasicPanX=200, BasicPanY=200, FlowPanX=200, FlowPanY=200;
+        [DataMember] public bool BasicFit;
         [DataMember(EmitDefaultValue = false)] public string HoverUi, PenColor;
         [DataMember] public double PenWidth;
     }
@@ -106,7 +113,7 @@ namespace StickyCanvas
         public static void Require(bool ok, string message) { if (!ok) throw new InvalidDataException(message); }
         public static void Validate(Note n)
         {
-            Require(n != null && (n.SchemaVersion == 1 || n.SchemaVersion == 2), "지원하지 않는 문서 버전입니다. 원본은 보존됩니다.");
+            Require(n != null && (n.SchemaVersion == 1 || n.SchemaVersion == 2 || n.SchemaVersion == 3), "지원하지 않는 문서 버전입니다. 원본은 보존됩니다.");
             Require(Id(n.Id) && n.Title != null && n.Title.Length <= 500 && Color(n.Background), "메모의 기본 정보가 올바르지 않습니다.");
             Require(Number(n.PaperWidth, 120, 8192) && Number(n.PaperHeight, 120, 8192), "종이 크기가 올바르지 않습니다.");
             Require(n.Elements != null && n.Elements.Count <= 1000, "메모 요소 개수 한도를 초과했습니다.");
@@ -121,6 +128,13 @@ namespace StickyCanvas
                     Require(n.SchemaVersion >= 2 && e.Points != null && e.Points.Count > 0 && e.Points.Count <= 20000, "필기 데이터가 올바르지 않습니다.");
                     inkPoints += e.Points.Count;
                     foreach (var point in e.Points) Require(point != null && Number(point.X, 0, 1) && Number(point.Y, 0, 1), "필기 좌표가 올바르지 않습니다.");
+                }
+                Require(n.SchemaVersion >= 3 || (e.GroupId == null && !e.ImageOpacity.HasValue && !e.CropX.HasValue), "새 기능 문서는 버전 3이어야 합니다.");
+                Require(e.GroupId == null || Id(e.GroupId), "그룹 ID 오류");
+                Require(!e.ImageOpacity.HasValue || Number(e.ImageOpacity.Value, 0, 1), "이미지 투명도 오류");
+                if (e.CropX.HasValue || e.CropY.HasValue || e.CropWidth.HasValue || e.CropHeight.HasValue) {
+                    Require(e.CropX.HasValue && e.CropY.HasValue && e.CropWidth.HasValue && e.CropHeight.HasValue, "자르기 영역 누락");
+                    Require(Number(e.CropX.Value, 0, 1) && Number(e.CropY.Value, 0, 1) && Number(e.CropWidth.Value, .001, 1) && Number(e.CropHeight.Value, .001, 1) && e.CropX.Value + e.CropWidth.Value <= 1.000001 && e.CropY.Value + e.CropHeight.Value <= 1.000001, "자르기 영역 오류");
                 }
                 Require(e.LineOrientation == null || new[] { "horizontal", "vertical", "down", "up" }.Contains(e.LineOrientation), "선 방향이 올바르지 않습니다.");
                 Require(Number(e.X, 0, 8192) && Number(e.Y, 0, 8192) && Number(e.Width, 16, 8192) && Number(e.Height, 16, 8192), "요소의 위치나 크기가 올바르지 않습니다.");
@@ -150,6 +164,8 @@ namespace StickyCanvas
         public static void Validate(NoteView v)
         {
             Require(v != null && Number(v.Left, -100000, 100000) && Number(v.Top, -100000, 100000) && Number(v.Width, 300, 12000) && Number(v.Height, 240, 12000) && Number(v.Zoom, .1, 4), "창 설정이 올바르지 않습니다.");
+            foreach(double value in new[]{v.PanX,v.PanY,v.BasicPanX,v.BasicPanY,v.FlowPanX,v.FlowPanY}) Require(Number(value,0,100000), "화면 이동 값 오류");
+            Require(Number(v.BasicZoom,0,4) && Number(v.FlowZoom,0,4), "모드 배율 오류");
             Require((v.HoverUi == null || v.HoverUi == "on" || v.HoverUi == "off") && (v.PenColor == null || Color(v.PenColor)) && Number(v.PenWidth, 0, 16), "보기/펜 설정이 올바르지 않습니다.");
         }
     }

@@ -46,6 +46,7 @@ namespace StickyCanvas
             var close = UI.Button("×", Close, "이 메모 숨기기 — 트레이에서 계속 실행"); DockPanel.SetDock(close, Dock.Right); header.Children.Add(close);
             var more = UI.Button("⋯", delegate { MoreMenu(); }, "메모 설정"); DockPanel.SetDock(more, Dock.Right); header.Children.Add(more);
             pin = UI.Button("고정", delegate { View.AlwaysOnTop = !View.AlwaysOnTop; Topmost = View.AlwaysOnTop; UpdatePin(); MarkDirty(false); }, "다른 창 위에 고정 / 해제"); DockPanel.SetDock(pin, Dock.Right); header.Children.Add(pin);
+            flowButton = UI.Button("Flow", ToggleFlow, "Flow 모드 켜기 / 끄기"); DockPanel.SetDock(flowButton, Dock.Right); header.Children.Add(flowButton);
             title.Text = Model.Title; title.MaxLength = 500; title.BorderThickness = new Thickness(0); title.Background = Brushes.Transparent; title.FontSize = 14; title.Padding = new Thickness(2, 7, 2, 4); title.VerticalContentAlignment = VerticalAlignment.Center;
             System.Windows.Automation.AutomationProperties.SetName(title, "메모 제목"); header.Children.Add(title);
             title.TextChanged += delegate { if (!loading) { Model.Title = title.Text; Title = "캔버스 메모 · " + Model.Title; MarkDirty(); } };
@@ -58,19 +59,22 @@ namespace StickyCanvas
             toolbar.Children.Add(formatToggle);
             toolbar.Children.Add(UI.Button("배치 ▾", PlacementMenu, "선택 요소 정렬 / 8칸 격자 스냅"));
             toolbar.Children.Add(UI.Button("↶", Undo, "실행 취소 (Ctrl+Z)")); toolbar.Children.Add(UI.Button("↷", Redo, "다시 실행 (Ctrl+Y)"));
+            toolbar.Children.Add(UI.Button("영역 ▾", AreaMenu));
+            toolbar.Children.Add(UI.Button("선택 ▾", SelectionMenu));
             toolbar.Children.Add(UI.Button("목록", app.ShowLibrary));
             BuildInkTools(toolbar);
             tools.Children.Add(formats); BuildFormatBar();
             var footer = new DockPanel { Height = 29, Background = UI.Brush("#FFFFF9DF") }; DockPanel.SetDock(footer, Dock.Bottom); dock.Children.Add(footer);
             status = UI.Button("로컬 저장됨", delegate { Flush(true); }, "저장 상태 · 클릭해 즉시 저장/재시도"); status.FontSize = 10; status.Padding = new Thickness(4, 0, 4, 0); status.MinHeight = 20; status.BorderThickness = new Thickness(0); DockPanel.SetDock(status, Dock.Right); footer.Children.Add(status);
-            var zoom = UI.Button(view.Fit ? "전체 맞춤" : "100%", delegate { View.Fit = !View.Fit; View.Zoom = 1; ApplyZoom(); MarkDirty(false); }, "100% / 전체 맞춤 전환");
-            zoom.FontSize = 10; zoom.Padding = new Thickness(3, 0, 3, 0); zoom.MinHeight = 20; DockPanel.SetDock(zoom, Dock.Right); footer.Children.Add(zoom);
+            zoomButton = UI.Button(view.Fit ? "전체 맞춤" : "100%", delegate { View.Fit = !View.Fit; View.Zoom = 1; ApplyZoom(); MarkDirty(false); }, "100% / 전체 맞춤 전환");
+            zoomButton.FontSize = 10; zoomButton.Padding = new Thickness(3, 0, 3, 0); zoomButton.MinHeight = 20; DockPanel.SetDock(zoomButton, Dock.Right); footer.Children.Add(zoomButton);
             selectionInfo.MouseLeftButtonDown += delegate { Properties(); }; footer.Children.Add(selectionInfo);
-            scroll.Content = Paper;
+            scroll.Content = new Border { Padding = new Thickness(200), Child = Paper };
+            InitializeNavigation();
             scroll.HorizontalContentAlignment = HorizontalAlignment.Left; scroll.VerticalContentAlignment = VerticalAlignment.Top;
             InitializePresentation(outer, dock, header);
             Paper.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e) { if (e.OriginalSource == Paper) { EndEditing(); Select(null); Paper.Focus(); } };
-            Paper.Focusable = true; scroll.SizeChanged += delegate { ApplyZoom(); zoom.Content = View.Fit ? "전체 맞춤" : Math.Round(View.Zoom * 100) + "%"; };
+            Paper.Focusable = true; scroll.SizeChanged += delegate { ApplyZoom(); zoomButton.Content = View.Fit ? "전체 맞춤" : Math.Round(View.Zoom * 100) + "%"; };
             AllowDrop = true;
             DragOver += delegate(object s, DragEventArgs e) { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
             Drop += delegate(object s, DragEventArgs e) { var files = e.Data.GetData(DataFormats.FileDrop) as string[]; if (files != null) foreach (var file in files.Take(10)) ImportImage(file); e.Handled = true; };
@@ -148,22 +152,26 @@ namespace StickyCanvas
             ActiveText = null; Selected = null; Paper.Children.Clear(); views.Clear();
             Paper.Width = Model.PaperWidth; Paper.Height = Model.PaperHeight; Paper.Background = UI.Brush(Model.Background);
             foreach (var e in Model.Elements) { var v = new ElementView(this, e); views[e.Id] = v; Paper.Children.Add(v); if (e.Id == selected) Selected = v; }
-            if (Selected != null) Selected.SetSelected(ControlsVisible);
+            RefreshMultiSelection();
             bool before = loading; loading = true; title.Text = Model.Title; loading = before;
             Title = "캔버스 메모 · " + Model.Title; scroll.Background = Paper.Background; Background = Paper.Background;
-            ConfigureInkOverlay(); ApplyZoom(); UpdateSelectionInfo(); RefreshChrome();
+            ConfigureInkOverlay(); ApplyZoom(); RefreshMultiSelection(); UpdateSelectionInfo(); RefreshChrome();
         }
         void ApplyZoom()
         {
             double zoom = View.Fit ? Math.Min(Math.Max(50, scroll.ViewportWidth) / Model.PaperWidth, Math.Max(50, scroll.ViewportHeight) / Model.PaperHeight) : View.Zoom;
-            zoom = Math.Max(.1, Math.Min(4, zoom)); Paper.LayoutTransform = new ScaleTransform(zoom, zoom);
+            zoom = Math.Max(.1, Math.Min(4, zoom)); Paper.LayoutTransform = new ScaleTransform(zoom, zoom); if(zoomButton != null) zoomButton.Content=View.Fit ? "전체 맞춤" : Math.Round(zoom*100)+"%";
         }
         public void Select(ElementView view)
+        {
+            SelectMany(view, false);
+        }
+        void LegacySelect(ElementView view)
         {
             if (Selected == view) return;
             if (ActiveText != null && ActiveText != view) EndEditing();
             if (Selected != null) Selected.SetSelected(false); Selected = view;
-            if (Selected != null) Selected.SetSelected(ControlsVisible); UpdateSelectionInfo();
+            RefreshMultiSelection(); UpdateSelectionInfo();
         }
         public void UpdateSelectionInfo()
         {
@@ -187,7 +195,7 @@ namespace StickyCanvas
             try
             {
                 if (contentDirty) { Rules.Validate(Model); history.Record(Model); Model.Revision++; Model.UpdatedAt = DateTime.UtcNow.ToString("o"); }
-                if (WindowState == WindowState.Normal) { View.Left = Left; View.Top = Top; View.Width = Width; View.Height = Height; }
+                if (WindowState == WindowState.Normal) { View.PanX = scroll.HorizontalOffset; View.PanY = scroll.VerticalOffset; View.Left = Left; View.Top = Top; View.Width = Width; View.Height = Height; }
                 App.Store.Save(Model, View); dirty = false; contentDirty = false;
                 status.Content = "로컬 저장됨"; status.Foreground = ChromeForeground; saveFailed = false; RefreshChrome(); App.RefreshLibrary(); App.MaybeRecovery(); return true;
             }
@@ -215,10 +223,11 @@ namespace StickyCanvas
         {
             Edit(delegate {
                 double offset = 20 + Model.Elements.Count % 7 * 18;
+                var visible = scroll.TranslatePoint(new Point(40, ControlsVisible ? chromePanel.ActualHeight + 24 : 40), Paper);
                 e.Width = Math.Min(e.Width, Model.PaperWidth - 20); e.Height = Math.Min(e.Height, Model.PaperHeight - 20);
-                e.X = Math.Min(offset, Model.PaperWidth - e.Width); e.Y = Math.Min(offset, Model.PaperHeight - e.Height); Model.Elements.Add(e);
+                e.X = Math.Max(0, Math.Min(Math.Max(offset,visible.X), Model.PaperWidth - e.Width)); e.Y = Math.Max(0, Math.Min(Math.Max(offset,visible.Y), Model.PaperHeight - e.Height)); Model.Elements.Add(e);
             });
-            if (views.ContainsKey(e.Id)) Select(views[e.Id]);
+            if (views.ContainsKey(e.Id)) { Select(views[e.Id]); RevealSelection(); }
         }
         void ShapesMenu()
         {
@@ -264,11 +273,11 @@ namespace StickyCanvas
         }
         public void Duplicate()
         {
-            if (Selected == null) return; var e = Json.Copy(Selected.Model); e.Id = Guid.NewGuid().ToString("N");
+            if (Selected == null) return; var e = Json.Copy(Selected.Model); e.Id = Guid.NewGuid().ToString("N"); e.GroupId=null;
             Edit(delegate { e.X = Math.Min(Model.PaperWidth - e.Width, e.X + 16); e.Y = Math.Min(Model.PaperHeight - e.Height, e.Y + 16); Model.Elements.Add(e); });
             Select(views[e.Id]);
         }
-        public void Delete() { if (Selected == null) return; string id = Selected.Model.Id; Edit(delegate { Model.Elements.RemoveAll(e => e.Id == id); }); }
+        public void Delete() { if(selectedIds.Count>1){Edit(delegate{Model.Elements.RemoveAll(e=>selectedIds.Contains(e.Id));});return;} if (Selected == null) return; string id = Selected.Model.Id; Edit(delegate { Model.Elements.RemoveAll(e => e.Id == id); }); }
         public void Reorder(int delta)
         {
             if (Selected == null) return; var e = Selected.Model;
@@ -344,13 +353,15 @@ namespace StickyCanvas
             else if (e.Key == Key.Escape) { SetInkTool("select"); EndEditing(); Select(null); Paper.Focus(); e.Handled = true; }
             else if (ActiveText != null) return;
             else if (ctrl && e.Key == Key.V) { try { if (Clipboard.ContainsImage()) PasteImage(); else if (Clipboard.ContainsText()) InsertText(Clipboard.GetText()); } catch (Exception ex) { MemoApp.Error(ex); } e.Handled = true; }
+            else if (ctrl && e.Key == Key.A) { SelectAllElements(); e.Handled=true; }
+            else if (ctrl && e.Key == Key.G) { SetGroup(!shift); e.Handled=true; }
             else if (ctrl && e.Key == Key.D) { Duplicate(); e.Handled = true; }
             else if (e.Key == Key.Delete || e.Key == Key.Back) { Delete(); e.Handled = true; }
             else if (e.Key == Key.Enter && Selected != null) { Selected.BeginEdit(); e.Handled = true; }
             else if (Selected != null && new[] { Key.Left, Key.Right, Key.Up, Key.Down }.Contains(e.Key))
             {
                 var m = Selected.Model; double step = shift ? 10 : 1;
-                Edit(delegate { m.X = Math.Max(0, Math.Min(Model.PaperWidth - m.Width, m.X + (e.Key == Key.Left ? -step : e.Key == Key.Right ? step : 0))); m.Y = Math.Max(0, Math.Min(Model.PaperHeight - m.Height, m.Y + (e.Key == Key.Up ? -step : e.Key == Key.Down ? step : 0))); }); e.Handled = true;
+                Edit(delegate {StartGroupDrag(m);MoveGroupDrag(m,e.Key==Key.Left ? -step : e.Key==Key.Right ? step : 0,e.Key==Key.Up ? -step : e.Key==Key.Down ? step : 0);}); e.Handled = true;
             }
         }
     }

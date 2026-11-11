@@ -216,6 +216,31 @@ namespace StickyCanvas
                         window.View.SnapGrid = true; Assert(window.SnapPosition(13, 100) == 16 && window.SnapPosition(101, 99) == 99 && window.SnapPosition(-3, 100) == 0, "Grid bounds");
                         window.View.SnapGrid = false; Assert(window.SnapPosition(13, 100) == 13, "Grid disabled");
                     });
+                    test("Flow expansion and mode switching preserve document geometry", delegate {
+                        string before=Json.Write(window.Model.Elements); double w=window.Model.PaperWidth;
+                        window.ExpandArea(480,360); Assert(window.Model.PaperWidth==Math.Min(8192,w+480),"Expansion");
+                        Assert(before==Json.Write(window.Model.Elements),"Expansion changed elements");
+                        window.ToggleFlow();Assert(window.View.Flow && !window.View.Fit,"Flow mode");window.ZoomAt(1.1,new Point(120,160));
+                        window.ToggleFlow();Assert(!window.View.Flow && before==Json.Write(window.Model.Elements),"Mode changed document");
+                    });
+                    test("multi-selection group drag preserves spacing and undoes in one step", delegate {
+                        var pair=window.Paper.Children.OfType<ElementView>().Take(2).ToArray();
+                        window.SelectMany(pair[0],false);window.SelectMany(pair[1],true);Assert(window.SelectionCount==2,"Shift selection");window.SetGroup(true);
+                        var a=window.Model.Elements.First(e=>e.Id==pair[0].Model.Id);var b=window.Model.Elements.First(e=>e.Id==pair[1].Model.Id);
+                        Assert(a.GroupId!=null && a.GroupId==b.GroupId,"Group identity");double delta=b.X-a.X,old=a.X;
+                        window.Record();window.StartGroupDrag(a);window.MoveGroupDrag(a,10,10);window.Record();Assert(Math.Abs(b.X-a.X-delta)<.001,"Group spacing");
+                        window.Undo();Assert(window.Model.Elements.First(e=>e.Id==a.Id).X==old,"Undo group drag");
+                        window.SetGroup(false);Rules.Validate(window.Model);
+                    });
+                    test("non-destructive image crop opacity restore and schema-3 backup round trip", delegate {
+                        var image=window.Model.Elements.First(e=>e.Type=="image");string asset=image.AssetId;
+                        window.Edit(delegate{window.Model.SchemaVersion=3;image.ImageOpacity=.4;image.CropX=.1;image.CropY=.1;image.CropWidth=.5;image.CropHeight=.5;});
+                        var bitmap=window.ImageSource(image);Assert(bitmap.PixelWidth>0 && image.AssetId==asset,"Crop source");
+                        string path=Path.Combine(root,"schema3.zip");window.Flush(false);app.Store.Export(path);var imported=app.Store.Import(path);
+                        Assert(imported.Any(n=>n.Elements.Any(e=>e.ImageOpacity==.4 && e.CropWidth==.5)),"Crop backup loss");
+                        var invalid=Json.Copy(window.Model);invalid.Elements.First(e=>e.Type=="image").CropWidth=2;bool rejected=false;try{Rules.Validate(invalid);}catch{rejected=true;}Assert(rejected,"Invalid crop accepted");
+                        window.RestoreImage(image);Assert(!image.CropX.HasValue && !image.ImageOpacity.HasValue && image.AssetId==asset,"Restore changed original");window.Undo();Assert(window.Model.Elements.First(e=>e.Id==image.Id).ImageOpacity==.4,"Undo restore");
+                    });
                     window.Close();
                     Assert(app.Store.View(n.Id).IsOpen == false, "Close should hide persisted note"); Assert(app.Store.Load().Any(a => a.Id == n.Id), "Close deleted note");
                 }

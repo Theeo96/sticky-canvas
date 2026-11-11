@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -44,6 +44,23 @@ namespace StickyCanvas
                 catch (Exception ex) { MemoApp.Error(ex); }
             }));
             return w.ShowDialog() == true;
+        }
+        public static bool ImageEdit(NoteWindow owner, Element e)
+        {
+            var panel = new StackPanel(); var w = Window(owner, "이미지 투명도·자르기", panel); w.Height=650;
+            panel.Children.Add(new Image { Source=owner.ImageSource(e), Height=180, Stretch=System.Windows.Media.Stretch.Uniform });
+            panel.Children.Add(new TextBlock {Text="원본 기준 백분율로 자릅니다. 원본 파일은 변경하지 않습니다.",TextWrapping=TextWrapping.Wrap});
+            var opacity=Field(panel,"불투명도 % (0=투명, 100=원본)",((e.ImageOpacity??1)*100).ToString("0.##"));
+            var x=Field(panel,"자르기 시작 X %",((e.CropX??0)*100).ToString("0.##"));
+            var y=Field(panel,"자르기 시작 Y %",((e.CropY??0)*100).ToString("0.##"));
+            var width=Field(panel,"자르기 너비 %",((e.CropWidth??1)*100).ToString("0.##"));
+            var height=Field(panel,"자르기 높이 %",((e.CropHeight??1)*100).ToString("0.##"));
+            var preview=new Image{Height=120,Stretch=System.Windows.Media.Stretch.Uniform};panel.Children.Add(preview);
+            Func<Element> candidate=delegate {var c=Json.Copy(e);c.ImageOpacity=Read(opacity)/100;c.CropX=Read(x)/100;c.CropY=Read(y)/100;c.CropWidth=Read(width)/100;c.CropHeight=Read(height)/100;
+                var n=Json.Copy(owner.Model);n.SchemaVersion=3;n.Elements[n.Elements.FindIndex(a=>a.Id==e.Id)]=c;Rules.Validate(n);return c;};
+            panel.Children.Add(UI.Button("미리보기",delegate {try {var c=candidate();preview.Source=owner.ImageSource(c);preview.Opacity=c.ImageOpacity.Value;}catch(Exception ex){MemoApp.Error(ex);}}));
+            panel.Children.Add(UI.Button("적용",delegate {try {var c=candidate();e.ImageOpacity=c.ImageOpacity;e.CropX=c.CropX;e.CropY=c.CropY;e.CropWidth=c.CropWidth;e.CropHeight=c.CropHeight;w.DialogResult=true;}catch(Exception ex){MemoApp.Error(ex);}}));
+            return w.ShowDialog()==true;
         }
         public static bool PaperSize(Window owner, double width, double height, out double resultWidth, out double resultHeight)
         {

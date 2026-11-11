@@ -54,7 +54,7 @@ namespace StickyCanvas
             scroll.Margin = new Thickness(0);
             scroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
             scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
-            if (Selected != null) Selected.SetSelected(ControlsVisible);
+            RefreshMultiSelection();
             ApplyChromeTheme();
         }
         void BuildInkTools(WrapPanel toolbar)
@@ -97,7 +97,7 @@ namespace StickyCanvas
         public void CommitInk(Stroke stroke)
         {
             var element = InkDrawing.FromStroke(stroke, Model.PaperWidth, Model.PaperHeight);
-            Edit(delegate { Model.SchemaVersion = 2; Model.Elements.Add(element); });
+            Edit(delegate { Model.SchemaVersion = Math.Max(2,Model.SchemaVersion); Model.Elements.Add(element); });
         }
         public bool EraseInkAt(Point point)
         {
