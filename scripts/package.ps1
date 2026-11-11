@@ -5,13 +5,13 @@ if (-not $SkipCurrent) {
     $taskRunning = @(Get-Process StickyCanvas -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $taskRoot 'release\current\StickyCanvas.exe') })
     if ($taskRunning.Count) { throw 'Exit StickyCanvas through its tray menu before updating current, or use -SkipCurrent for a versioned package only.' }
 }
-$taskRelease = Join-Path $taskRoot 'release\0.5.0'
+$taskRelease = Join-Path $taskRoot 'release\0.6.0'
 New-Item -ItemType Directory -Path $taskRelease -Force | Out-Null
 foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config')) {
     Copy-Item -LiteralPath (Join-Path (Join-Path $taskRoot 'bin') $taskName) -Destination (Join-Path $taskRelease $taskName) -Force
 }
 $taskGuide = @'
-캔버스 메모 v0.5.0 — Windows x64
+캔버스 메모 v0.6.0 — Windows x64
 
 평소에는 내용과 좌상단 작은 ☰ 버튼만 보입니다.
 좌상단 ☰ 버튼을 누를 때마다 상단 도구를 표시/숨깁니다.
@@ -20,7 +20,7 @@ $taskGuide = @'
 글상자·도형·이미지·서식을 누르면 펜/지우개 모드가 자동 종료됩니다. 서식 ▾/▴는 펼침 상태를 나타냅니다.
 배치 ▾에서 종이 기준 정렬과 이동 시 8칸 격자 맞춤을 사용할 수 있습니다.
 펜/지우개 모드에서도 도구를 숨길 수 있습니다. 선택 또는 Esc로 그리기를 종료합니다.
-펜 색·굵기, 선 전체 지우기, 필기 이동·크기 조절·실행 취소·저장을 지원합니다.
+펜 색·굵기, 픽셀 부분 지우기, 필기 이동·크기 조절·실행 취소·저장을 지원합니다.
 필기를 넣은 메모는 문서 버전 2가 되어 v0.1.0에서 열 수 없습니다.
 
 실행: StickyCanvas.exe 더블클릭. StickyCanvas.exe.config를 같은 폴더에 둡니다.
@@ -62,7 +62,13 @@ Shift+클릭 / 빈 공간 드래그: 여러 요소 선택. 선택 ▾ 또는 Ctr
 선택 손잡이 드래그 / 방향키로 묶음 이동. Ctrl+A 전체 선택 (글 편집 중에는 본문 선택).
 이미지 우클릭 → 이미지 투명도·자르기: 불투명도와 원본 기준 자르기 백분율, 미리보기·적용.
 이미지 원상복구: 자르기·불투명도 초기화. 원본 파일과 배치 크기는 유지합니다.
-그룹·이미지 편집 문서는 스키마 3입니다. 이전 버전으로 열지 마세요.
+그룹·이미지 편집은 스키마 3, 픽셀 필기·잠금은 스키마 4입니다. 이전 버전으로 열지 마세요.
+
+v0.6: 선택 전체 테두리 모서리로 비율 유지 크기 조절 (글자·여백 포함).
+선택 메뉴: 3개 이상 항목 가로/세로 간격 맞춤, 잠금/해제. 잠긴 묶음은 변형·삭제·지우기 차단.
+새 펜 그림은 투명 PNG입니다. 지우개는 해당 영역 픽셀만 지웁니다. 일반 사진·글·도형은 유지.
+펜/지우개 슬라이더와 원형 미리보기, px 수치를 제공합니다. 원형 미리보기는 최대 32px입니다.
+기존 벡터 필기는 지우개 사용 시 픽셀로 전환됩니다. 실행 취소로 복원할 수 있습니다.
 
 상세 기획·사용 안내·검증 기록은 원래 프로젝트 폴더의 docs/를 참고하세요.
 문제가 생기면 저장 실패 표시 여부와 했던 조작을 알려주세요. 원본 데이터 폴더는 먼저 보존하세요.
@@ -75,7 +81,7 @@ foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config','사용안�
     Copy-Item -LiteralPath (Join-Path $taskRelease $taskName) -Destination (Join-Path $taskCurrent $taskName) -Force
 }
 }
-$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.5.0.zip'
+$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.6.0.zip'
 Compress-Archive -LiteralPath @((Join-Path $taskRelease 'StickyCanvas.exe'),(Join-Path $taskRelease 'StickyCanvas.exe.config'),(Join-Path $taskRelease '사용안내.txt')) -DestinationPath $taskZip -Force
 Get-FileHash -LiteralPath (Join-Path $taskRelease 'StickyCanvas.exe') -Algorithm SHA256 | Select-Object Path,Hash
 Get-Item -LiteralPath $taskZip | Select-Object FullName,Length

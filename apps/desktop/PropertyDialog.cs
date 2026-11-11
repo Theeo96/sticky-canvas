@@ -57,7 +57,7 @@ namespace StickyCanvas
             var height=Field(panel,"자르기 높이 %",((e.CropHeight??1)*100).ToString("0.##"));
             var preview=new Image{Height=120,Stretch=System.Windows.Media.Stretch.Uniform};panel.Children.Add(preview);
             Func<Element> candidate=delegate {var c=Json.Copy(e);c.ImageOpacity=Read(opacity)/100;c.CropX=Read(x)/100;c.CropY=Read(y)/100;c.CropWidth=Read(width)/100;c.CropHeight=Read(height)/100;
-                var n=Json.Copy(owner.Model);n.SchemaVersion=3;n.Elements[n.Elements.FindIndex(a=>a.Id==e.Id)]=c;Rules.Validate(n);return c;};
+                var n=Json.Copy(owner.Model);n.SchemaVersion=Math.Max(3,n.SchemaVersion);n.Elements[n.Elements.FindIndex(a=>a.Id==e.Id)]=c;Rules.Validate(n);return c;};
             panel.Children.Add(UI.Button("미리보기",delegate {try {var c=candidate();preview.Source=owner.ImageSource(c);preview.Opacity=c.ImageOpacity.Value;}catch(Exception ex){MemoApp.Error(ex);}}));
             panel.Children.Add(UI.Button("적용",delegate {try {var c=candidate();e.ImageOpacity=c.ImageOpacity;e.CropX=c.CropX;e.CropY=c.CropY;e.CropWidth=c.CropWidth;e.CropHeight=c.CropHeight;w.DialogResult=true;}catch(Exception ex){MemoApp.Error(ex);}}));
             return w.ShowDialog()==true;

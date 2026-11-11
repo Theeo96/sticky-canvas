@@ -179,17 +179,19 @@ namespace StickyCanvas
                         window.BeginTitleEdit(); Assert(window.TitleEditing, "Title edit did not start");
                         window.FinishTitleEdit(); Assert(!window.TitleEditing, "Title edit did not finish");
                     });
-                    test("pen stroke JSON, hit-test eraser, undo and backup preserve text and images", delegate {
+                    test("pixel pen, partial eraser, undo and backup preserve text and images", delegate {
                         string original = Json.Write(window.Model.Elements);
                         var points = new System.Windows.Input.StylusPointCollection(new[] { new System.Windows.Input.StylusPoint(50, 50), new System.Windows.Input.StylusPoint(80, 90), new System.Windows.Input.StylusPoint(130, 60) });
                         var stroke = new System.Windows.Ink.Stroke(points, new System.Windows.Ink.DrawingAttributes { Color = Colors.Blue, Width = 5, Height = 5 });
-                        window.CommitInk(stroke); Assert(window.Model.SchemaVersion == 2 && window.Model.Elements.Last().Type == "stroke", "Stroke not stored"); Rules.Validate(window.Model);
-                        var saved = Json.Copy(window.Model); Assert(saved.Elements.Last().Points.Count >= 3, "Stroke point loss");
-                        Assert(!window.EraseInkAt(new Point(400, 330)), "Eraser hit empty paper");
-                        Assert(window.EraseInkAt(new Point(80, 90)), "Eraser missed line"); Assert(Json.Write(window.Model.Elements) == original, "Eraser changed other elements");
-                        window.Undo(); Assert(window.Model.Elements.Last().Type == "stroke", "Undo eraser");
-                        window.Flush(false); string path = Path.Combine(root, "ink.zip"); app.Store.Export(path);
-                        var copies = app.Store.Import(path); Assert(copies.Single().Elements.Last().Points.Count == saved.Elements.Last().Points.Count, "Ink backup loss");
+                        window.CommitInk(stroke);Assert(window.Model.SchemaVersion==4 && window.Model.Elements.Last().IsDrawing,"Pixel drawing not stored");Rules.Validate(window.Model);
+                        var drawing=window.Model.Elements.Last();string before=drawing.AssetId;
+                        Assert(!window.EraseInkAt(new Point(400,330)),"Eraser hit blank paper");
+                        Assert(window.EraseInkAt(new Point(80,90)),"Partial erase missed line");
+                        Assert(window.Model.Elements.Last().AssetId!=before && window.Model.Elements.Last().IsDrawing,"Partial erase removed object");
+                        Assert(Json.Write(window.Model.Elements.Take(window.Model.Elements.Count-1).ToList())==original,"Eraser changed other elements");
+                        window.Undo();Assert(window.Model.Elements.Last().AssetId==before,"Undo pixel erase");
+                        window.Flush(false);string path=Path.Combine(root,"ink.zip");app.Store.Export(path);var copies=app.Store.Import(path);
+                        Assert(copies.Single().Elements.Last().AssetId==before && copies.Single().Elements.Last().IsDrawing,"Pixel backup loss");
                         window.SetInkTool("pen"); Assert(window.InkTool == "pen" && !window.ControlsVisible, "Pen mode presentation"); window.SetInkTool("select");
                     });
                     test("hidden-UI save failure shows retry badge without forcing tools open", delegate {
@@ -234,12 +236,30 @@ namespace StickyCanvas
                     });
                     test("non-destructive image crop opacity restore and schema-3 backup round trip", delegate {
                         var image=window.Model.Elements.First(e=>e.Type=="image");string asset=image.AssetId;
-                        window.Edit(delegate{window.Model.SchemaVersion=3;image.ImageOpacity=.4;image.CropX=.1;image.CropY=.1;image.CropWidth=.5;image.CropHeight=.5;});
+                        window.Edit(delegate{window.Model.SchemaVersion=Math.Max(3,window.Model.SchemaVersion);image.ImageOpacity=.4;image.CropX=.1;image.CropY=.1;image.CropWidth=.5;image.CropHeight=.5;});
                         var bitmap=window.ImageSource(image);Assert(bitmap.PixelWidth>0 && image.AssetId==asset,"Crop source");
                         string path=Path.Combine(root,"schema3.zip");window.Flush(false);app.Store.Export(path);var imported=app.Store.Import(path);
                         Assert(imported.Any(n=>n.Elements.Any(e=>e.ImageOpacity==.4 && e.CropWidth==.5)),"Crop backup loss");
                         var invalid=Json.Copy(window.Model);invalid.Elements.First(e=>e.Type=="image").CropWidth=2;bool rejected=false;try{Rules.Validate(invalid);}catch{rejected=true;}Assert(rejected,"Invalid crop accepted");
                         window.RestoreImage(image);Assert(!image.CropX.HasValue && !image.ImageOpacity.HasValue && image.AssetId==asset,"Restore changed original");window.Undo();Assert(window.Model.Elements.First(e=>e.Id==image.Id).ImageOpacity==.4,"Undo restore");
+                    });
+                    test("selection scale, locked transforms and equal gaps preserve undo",delegate {
+                        window.SetUiPinned(true);window.SelectAllElements();window.SetGroup(false);
+                        window.SelectAllElements();var primary=window.Model.Elements.First();window.Record();window.StartGroupDrag(primary);
+                        double old=primary.Width;window.ResizeSelection(-10,-10,1,1);window.Record();Rules.Validate(window.Model);Assert(primary.Width<old,"Selection resize did not scale");
+                        window.Undo();Assert(window.Model.Elements.First().Width==old,"Undo selection scale");
+                        window.SelectAllElements();window.LockSelection(true);string locked=Json.Write(window.Model.Elements);window.StartGroupDrag(window.Model.Elements.First());window.MoveGroupDrag(window.Model.Elements.First(),30,30);window.ResizeSelection(20,20,1,1);window.Delete();window.Distribute(false);
+                        Assert(locked==Json.Write(window.Model.Elements),"Locked elements changed");window.LockSelection(false);
+                        window.Edit(delegate{window.Model.Elements.Clear();foreach(double x in new[]{20.0,130.0,280.0}){var e=Element.Text("spacing");e.X=x;e.Y=20;e.Width=30;e.Height=30;window.Model.Elements.Add(e);}});
+                        window.SelectAllElements();window.Distribute(false);var ordered=window.Model.Elements.OrderBy(e=>e.X).ToArray();Assert(Math.Abs((ordered[1].X-ordered[0].X)-(ordered[2].X-ordered[1].X))<.001,"Unequal gaps");window.Undo();Assert(window.Model.Elements[1].X==130,"Undo spacing");
+                    });
+                    test("legacy vector eraser converts only touched pixels and lock blocks erasing",delegate {
+                        var points=new System.Windows.Input.StylusPointCollection(new[]{new System.Windows.Input.StylusPoint(50,50),new System.Windows.Input.StylusPoint(150,50)});
+                        var vector=InkDrawing.FromStroke(new System.Windows.Ink.Stroke(points),window.Model.PaperWidth,window.Model.PaperHeight);
+                        window.Edit(delegate{window.Model.Elements.Add(vector);});Assert(window.EraseInkAt(new Point(80,50)),"Legacy erase missed");Assert(vector.IsDrawing && vector.Points==null,"Legacy conversion");
+                        string asset=vector.AssetId;window.Edit(delegate{vector.Locked=true;});Assert(!window.EraseInkAt(new Point(130,50)) && vector.AssetId==asset,"Locked drawing erased");
+                        var bitmap=window.App.Store.Bitmap(asset,8192);var data=new byte[bitmap.PixelWidth*bitmap.PixelHeight*4];var rgba=new System.Windows.Media.Imaging.FormatConvertedBitmap(bitmap,PixelFormats.Pbgra32,null,0);rgba.CopyPixels(data,bitmap.PixelWidth*4,0);
+                        Assert(data.Where((v,i)=>i%4==3).Any(v=>v==0)&&data.Where((v,i)=>i%4==3).Any(v=>v>0),"Partial erase did not preserve visible pixels");
                     });
                     window.Close();
                     Assert(app.Store.View(n.Id).IsOpen == false, "Close should hide persisted note"); Assert(app.Store.Load().Any(a => a.Id == n.Id), "Close deleted note");

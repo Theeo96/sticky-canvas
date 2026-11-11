@@ -52,16 +52,16 @@ namespace StickyCanvas
             title.TextChanged += delegate { if (!loading) { Model.Title = title.Text; Title = "캔버스 메모 · " + Model.Title; MarkDirty(); } };
             DockPanel.SetDock(tools, Dock.Top); dock.Children.Add(tools);
             var toolbar = new WrapPanel { Margin = new Thickness(3, 2, 3, 1) }; tools.Children.Add(toolbar);
-            toolbar.Children.Add(UI.Button("＋ 글상자", delegate { InsertText(""); }));
-            toolbar.Children.Add(UI.Button("도형 ▾", ShapesMenu));
-            toolbar.Children.Add(UI.Button("이미지", ChooseImage));
+            toolbar.Children.Add(UI.Button("T 글상자", delegate { InsertText(""); }));
+            toolbar.Children.Add(UI.Button("◇ 도형 ▾", ShapesMenu));
+            toolbar.Children.Add(UI.Button("▧ 이미지", ChooseImage));
             formatToggle = UI.Button("Aa 서식 ▾", ToggleFormats, "글꼴 서식 펼치기 / 접기");
             toolbar.Children.Add(formatToggle);
-            toolbar.Children.Add(UI.Button("배치 ▾", PlacementMenu, "선택 요소 정렬 / 8칸 격자 스냅"));
+            toolbar.Children.Add(UI.Button("⊞ 배치 ▾", PlacementMenu, "선택 요소 정렬 / 8칸 격자 스냅"));
             toolbar.Children.Add(UI.Button("↶", Undo, "실행 취소 (Ctrl+Z)")); toolbar.Children.Add(UI.Button("↷", Redo, "다시 실행 (Ctrl+Y)"));
-            toolbar.Children.Add(UI.Button("영역 ▾", AreaMenu));
-            toolbar.Children.Add(UI.Button("선택 ▾", SelectionMenu));
-            toolbar.Children.Add(UI.Button("목록", app.ShowLibrary));
+            toolbar.Children.Add(UI.Button("▱ 영역 ▾", AreaMenu));
+            toolbar.Children.Add(UI.Button("↖ 선택 ▾", SelectionMenu));
+            toolbar.Children.Add(UI.Button("☷ 목록", app.ShowLibrary));
             BuildInkTools(toolbar);
             tools.Children.Add(formats); BuildFormatBar();
             var footer = new DockPanel { Height = 29, Background = UI.Brush("#FFFFF9DF") }; DockPanel.SetDock(footer, Dock.Bottom); dock.Children.Add(footer);
@@ -78,7 +78,7 @@ namespace StickyCanvas
             AllowDrop = true;
             DragOver += delegate(object s, DragEventArgs e) { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
             Drop += delegate(object s, DragEventArgs e) { var files = e.Data.GetData(DataFormats.FileDrop) as string[]; if (files != null) foreach (var file in files.Take(10)) ImportImage(file); e.Handled = true; };
-            saveTimer.Tick += delegate { if ((DateTime.UtcNow - lastChange).TotalMilliseconds >= 280 || (DateTime.UtcNow - firstChange).TotalMilliseconds >= 1000) Flush(false); };
+            saveTimer.Tick += delegate { if(eraseBuffers!=null || transformGesture)return; if ((DateTime.UtcNow - lastChange).TotalMilliseconds >= 280 || (DateTime.UtcNow - firstChange).TotalMilliseconds >= 1000) Flush(false); };
             LocationChanged += delegate { if (!loading) MarkDirty(false); }; SizeChanged += delegate { if (!loading) MarkDirty(false); };
             Closing += delegate(object s, System.ComponentModel.CancelEventArgs e) {
                 if (App.Quitting || trashed) return;
@@ -120,6 +120,7 @@ namespace StickyCanvas
         }
         void Format(DependencyProperty property, object value)
         {
+            if(SelectedLocked)return;
             var v = ActiveText ?? Selected; if (v == null || v.Model.Type != "text") return;
             if (v.Editor == null) v.BeginEdit();
             try
@@ -133,6 +134,7 @@ namespace StickyCanvas
         }
         void Toggle(RoutedUICommand command)
         {
+            if(SelectedLocked)return;
             var v = ActiveText ?? Selected; if (v == null || v.Model.Type != "text") return;
             if (v.Editor == null) v.BeginEdit();
             if (v.Editor.Selection.IsEmpty && v.Model.PlainText.Length > 0) v.Editor.SelectAll();
@@ -140,6 +142,7 @@ namespace StickyCanvas
         }
         void Align(TextAlignment align)
         {
+            if(SelectedLocked)return;
             var v = ActiveText ?? Selected; if (v == null || v.Model.Type != "text") return;
             if (v.Editor == null) v.BeginEdit();
             if (v.Editor.Selection.IsEmpty) foreach (var p in v.Editor.Document.Blocks.OfType<Paragraph>()) p.TextAlignment = align;
@@ -188,7 +191,7 @@ namespace StickyCanvas
         }
         public bool Flush(bool alert)
         {
-            saveTimer.Stop(); if (trashed) return true;
+            FinishPixelErase(); saveTimer.Stop(); if (trashed) return true;
             if (ActiveText != null) ActiveText.Capture();
             if (!dirty) return true;
             long rev = Model.Revision; string updated = Model.UpdatedAt;
@@ -273,13 +276,15 @@ namespace StickyCanvas
         }
         public void Duplicate()
         {
+            if(SelectedLocked)return;
             if (Selected == null) return; var e = Json.Copy(Selected.Model); e.Id = Guid.NewGuid().ToString("N"); e.GroupId=null;
             Edit(delegate { e.X = Math.Min(Model.PaperWidth - e.Width, e.X + 16); e.Y = Math.Min(Model.PaperHeight - e.Height, e.Y + 16); Model.Elements.Add(e); });
             Select(views[e.Id]);
         }
-        public void Delete() { if(selectedIds.Count>1){Edit(delegate{Model.Elements.RemoveAll(e=>selectedIds.Contains(e.Id));});return;} if (Selected == null) return; string id = Selected.Model.Id; Edit(delegate { Model.Elements.RemoveAll(e => e.Id == id); }); }
+        public void Delete() { if(SelectedLocked)return; if(selectedIds.Count>1){Edit(delegate{Model.Elements.RemoveAll(e=>selectedIds.Contains(e.Id));});return;} if (Selected == null) return; string id = Selected.Model.Id; Edit(delegate { Model.Elements.RemoveAll(e => e.Id == id); }); }
         public void Reorder(int delta)
         {
+            if(SelectedLocked)return;
             if (Selected == null) return; var e = Selected.Model;
             Edit(delegate { int index = Model.Elements.IndexOf(e); Model.Elements.Remove(e); Model.Elements.Insert(Math.Max(0, Math.Min(Model.Elements.Count, index + delta)), e); });
         }
@@ -295,11 +300,13 @@ namespace StickyCanvas
         }
         public void FitTextHeight()
         {
+            if(SelectedLocked)return;
             if (Selected == null || Selected.Model.Type != "text") return; var e = Selected.Model;
             Edit(delegate { var t = TextCodec.Display(e); t.Measure(new Size(e.Width - e.StrokeWidth * 2, double.PositiveInfinity)); e.Height = Math.Min(Model.PaperHeight - e.Y, Math.Max(16, t.DesiredSize.Height + e.StrokeWidth * 2 + 4)); });
         }
         public void Properties()
         {
+            if(SelectedLocked)return;
             if (Selected == null) return; EndEditing(); var element = Selected.Model; var copy = Json.Copy(element);
             if (PropertyDialog.Edit(this, copy)) Edit(delegate { int index = Model.Elements.FindIndex(e => e.Id == copy.Id); Model.Elements[index] = copy; });
         }

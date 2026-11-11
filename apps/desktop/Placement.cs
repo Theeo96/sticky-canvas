@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -23,7 +23,7 @@ namespace StickyCanvas
         public void AlignElement(string alignment)
         {
             ExitInkForObjectAction();
-            if (Selected == null) return;
+            if (Selected == null || SelectedLocked) return;
             var element = Selected.Model;
             Edit(delegate {
                 switch (alignment)

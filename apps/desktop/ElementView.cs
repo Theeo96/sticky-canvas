@@ -26,6 +26,7 @@ namespace StickyCanvas
             };
             var menu = new ContextMenu();
             Action<string, Action> add = delegate(string title, Action action) { var item = new MenuItem { Header = title }; item.Click += delegate { owner.Select(this); action(); }; menu.Items.Add(item); };
+            add("▣ 잠금 / 해제", delegate { owner.LockSelection(!Model.Locked); });
             add("글 편집", delegate { if (Model.Type == "text") BeginEdit(); });
             add("위치·크기·서식…", owner.Properties);
             add("앞으로", delegate { owner.Reorder(1); }); add("뒤로", delegate { owner.Reorder(-1); });
@@ -46,6 +47,7 @@ namespace StickyCanvas
             }
             owner.TrackMenu(menu); ContextMenu = menu;
         }
+        public void ShowPixelPreview(System.Windows.Media.Imaging.BitmapSource source) {body.Children.Clear();body.Children.Add(new Image{Source=source,Stretch=Stretch.Fill,IsHitTestVisible=false});}
         public void Layout()
         {
             Width = Model.Width; Height = Model.Height; Canvas.SetLeft(this, Model.X); Canvas.SetTop(this, Model.Y);
@@ -64,7 +66,7 @@ namespace StickyCanvas
             }
             else if (Model.Type == "image")
             {
-                try { body.Children.Add(new Image { Source = owner.ImageSource(Model), Opacity = Model.ImageOpacity ?? 1, Stretch = Stretch.Uniform, IsHitTestVisible = false }); }
+                try { body.Children.Add(new Image { Source = owner.ImageSource(Model), Opacity = Model.ImageOpacity ?? 1, Stretch = Model.IsDrawing ? Stretch.Fill : Stretch.Uniform, IsHitTestVisible = false }); }
                 catch { body.Children.Add(new TextBlock { Text = "이미지를 읽을 수 없습니다\n원본 데이터는 보존됩니다", TextWrapping = TextWrapping.Wrap, Foreground = UI.Muted, Background = UI.Brush("#FFF3E7D2") }); }
                 Background = Brushes.Transparent;
             }
@@ -75,8 +77,10 @@ namespace StickyCanvas
             selected = selected && owner.ControlsVisible;
             handles.Children.Clear(); if (!selected) return;
             handles.Children.Add(new Border { BorderBrush = UI.Brush("#FF4C81B8"), BorderThickness = new Thickness(1), IsHitTestVisible = false });
+            if(Model.Locked) { handles.Children.Add(new TextBlock{Text="▣",Foreground=Brushes.SteelBlue,HorizontalAlignment=HorizontalAlignment.Right,IsHitTestVisible=false});return; }
             var move = new Thumb { Height = 12, VerticalAlignment = VerticalAlignment.Top, Background = UI.Brush("#99537FB1"), Cursor = Cursors.SizeAll, ToolTip = "이 손잡이를 끌어 요소 이동" };
             System.Windows.Automation.AutomationProperties.SetName(move, "선택 요소 이동"); handles.Children.Add(move); WireDrag(move, 0, 0);
+            if(owner.SelectionCount>1)return;
             foreach (int x in new[] { -1, 1 }) foreach (int y in new[] { -1, 1 })
             {
                 var handle = new Thumb { Width = 10, Height = 10, HorizontalAlignment = x < 0 ? HorizontalAlignment.Left : HorizontalAlignment.Right, VerticalAlignment = y < 0 ? VerticalAlignment.Top : VerticalAlignment.Bottom, Background = Brushes.White, BorderBrush = UI.Brush("#FF4C81B8"), BorderThickness = new Thickness(1), Cursor = x == y ? Cursors.SizeNWSE : Cursors.SizeNESW, ToolTip = "요소 크기 조절" };
@@ -87,14 +91,16 @@ namespace StickyCanvas
         {
             Point start = new Point(); double x = 0, y = 0, width = 0, height = 0;
             thumb.DragStarted += delegate {
-                owner.EndEditing(); owner.Record(); start = Mouse.GetPosition(owner.Paper); owner.StartGroupDrag(Model); x = Model.X; y = Model.Y; width = Model.Width; height = Model.Height;
+                owner.SetTransformGesture(true);owner.EndEditing(); owner.Record(); start = Mouse.GetPosition(owner.Paper); owner.StartGroupDrag(Model); x = Model.X; y = Model.Y; width = Model.Width; height = Model.Height;
             };
             thumb.DragDelta += delegate {
+                if(owner.SelectedLocked)return;
                 var p = Mouse.GetPosition(owner.Paper); double dx = p.X - start.X, dy = p.Y - start.Y;
                 if (sideX == 0)
                 {
                     owner.MoveGroupDrag(Model, dx, dy);
                 }
+                else if(owner.SelectionCount>1) owner.ResizeSelection(dx,dy,sideX,sideY);
                 else
                 {
                     double w = Math.Max(16, width + dx * sideX), h = Math.Max(16, height + dy * sideY);
@@ -111,11 +117,11 @@ namespace StickyCanvas
                 }
                 Layout(); owner.MarkDirty();
             };
-            thumb.DragCompleted += delegate { owner.Record(); RefreshBody(); owner.UpdateSelectionInfo(); };
+            thumb.DragCompleted += delegate { owner.SetTransformGesture(false);owner.Record(); RefreshBody(); owner.UpdateSelectionInfo(); };
         }
         public void BeginEdit()
         {
-            if (Model.Type != "text" || Editor != null) return;
+            if (Model.Locked || Model.Type != "text" || Editor != null) return;
             owner.EndEditing(); owner.Record(); owner.Select(this); body.Children.Clear();
             Editor = new RichTextBox { Document = TextCodec.Document(Model), BorderThickness = new Thickness(Model.StrokeWidth), BorderBrush = UI.Brush(Model.Stroke), Background = UI.Brush(Model.Fill), Padding = new Thickness(Model.Padding), IsUndoEnabled = false, AcceptsTab = true, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             System.Windows.Automation.AutomationProperties.SetName(Editor, "메모 글상자 편집");

@@ -31,19 +31,24 @@ namespace StickyCanvas {
   }
   void RefreshMultiSelection() {
    selectedIds.RemoveWhere(id => !Model.Elements.Any(e => e.Id == id));
+   if(selectionFrame!=null){Paper.Children.Remove(selectionFrame);selectionFrame=null;}
    foreach (var v in views.Values) v.SetSelected(selectedIds.Contains(v.Model.Id) && ControlsVisible);
+   UpdateSelectionFrame();
   }
   public void SelectAllElements() { EndEditing(); selectedIds.Clear(); foreach(var e in Model.Elements) selectedIds.Add(e.Id); Selected = views.Values.FirstOrDefault(); RefreshMultiSelection(); }
   public void SetGroup(bool group) {
+   if (SelectedLocked)return;
    if (selectedIds.Count == 0 || (group && selectedIds.Count < 2)) return;
    string id = group ? Guid.NewGuid().ToString("N") : null;
-   Edit(delegate { Model.SchemaVersion = 3; foreach(var e in Model.Elements.Where(e => selectedIds.Contains(e.Id))) e.GroupId = id; });
+   Edit(delegate { Model.SchemaVersion = Math.Max(3,Model.SchemaVersion); foreach(var e in Model.Elements.Where(e => selectedIds.Contains(e.Id))) e.GroupId = id; });
   }
   public void StartGroupDrag(Element primary) {
    if (!selectedIds.Contains(primary.Id)) { selectedIds.Clear(); selectedIds.Add(primary.Id); }
+   resizeSnapshot = Model.Elements.Where(e=>selectedIds.Contains(e.Id)).Select(e=>Json.Copy(e)).ToList();
    dragPositions = Model.Elements.Where(e => selectedIds.Contains(e.Id)).ToDictionary(e => e.Id, e => new Point(e.X,e.Y));
   }
   public void MoveGroupDrag(Element primary, double dx, double dy) {
+   if (SelectedLocked) return;
    if (dragPositions == null || dragPositions.Count == 0) return;
    var anchor = dragPositions[primary.Id];
    dx = (View.SnapGrid ? Math.Round((anchor.X+dx)/8)*8 : anchor.X+dx)-anchor.X;
@@ -54,6 +59,7 @@ namespace StickyCanvas {
    dx = Math.Min(dx, items.Min(e => Model.PaperWidth-e.Width-dragPositions[e.Id].X));
    dy = Math.Min(dy, items.Min(e => Model.PaperHeight-e.Height-dragPositions[e.Id].Y));
    foreach(var e in items) { e.X=dragPositions[e.Id].X+dx; e.Y=dragPositions[e.Id].Y+dy; views[e.Id].Layout(); }
+   UpdateSelectionFrame();
   }
   double Scale { get { return Paper.LayoutTransform.Value.M11; } }
   public void ExpandArea(double right, double bottom) {
@@ -92,8 +98,10 @@ namespace StickyCanvas {
   }
   void SelectionMenu() {
    var m=new ContextMenu(); Action<string,Action> add=(label,action)=>{var i=new MenuItem{Header=label};i.Click+=delegate{action();};m.Items.Add(i);};
+   add("↔ 가로 간격 맞춤",()=>Distribute(false));add("↕ 세로 간격 맞춤",()=>Distribute(true));
+   add("▣ 선택 잠금",()=>LockSelection(true));add("□ 선택 잠금 해제",()=>LockSelection(false));
    add("모두 선택",SelectAllElements);add("그룹 만들기",()=>SetGroup(true));add("그룹 해제",()=>SetGroup(false));add("선택 항목으로 이동",RevealSelection);
-   add("선택 항목 삭제",delegate {if(selectedIds.Count>0)Edit(delegate {Model.Elements.RemoveAll(e=>selectedIds.Contains(e.Id));});}); TrackMenu(m);m.IsOpen=true;
+   add("선택 항목 삭제",delegate {if(selectedIds.Count>0 && !SelectedLocked)Edit(delegate {Model.Elements.RemoveAll(e=>selectedIds.Contains(e.Id));});}); TrackMenu(m);m.IsOpen=true;
   }
   void InitializeNavigation() {
    Loaded+=delegate {flowButton.Content=View.Flow ? "Flow ●":"Flow";scroll.ScrollToHorizontalOffset(View.PanX>0?View.PanX:200);scroll.ScrollToVerticalOffset(View.PanY>0?View.PanY:200);};
@@ -126,13 +134,13 @@ namespace StickyCanvas {
    SizeChanged+=delegate {if(View.Flow && IsLoaded) {double w=Model.PaperWidth,h=Model.PaperHeight;GrowTo(Math.Max(0,scroll.HorizontalOffset-200)/Scale+scroll.ViewportWidth/Scale,Math.Max(0,scroll.VerticalOffset-200)/Scale+scroll.ViewportHeight/Scale);if(w!=Model.PaperWidth||h!=Model.PaperHeight){Record();MarkDirty();}}};
   }
   public BitmapSource ImageSource(Element e) {
-   var source=App.Store.Bitmap(e.AssetId);
+   var source=App.Store.Bitmap(e.AssetId,e.IsDrawing?8192:1600);
    if(!e.CropX.HasValue)return source;
    int x=(int)(e.CropX.Value*source.PixelWidth), y=(int)(e.CropY.Value*source.PixelHeight);
    int w=Math.Max(1,Math.Min(source.PixelWidth-x,(int)(e.CropWidth.Value*source.PixelWidth))), h=Math.Max(1,Math.Min(source.PixelHeight-y,(int)(e.CropHeight.Value*source.PixelHeight)));
    var crop=new CroppedBitmap(source,new Int32Rect(x,y,w,h));crop.Freeze();return crop;
   }
-  public void RestoreImage(Element e) {Edit(delegate {e.ImageOpacity=null;e.CropX=e.CropY=e.CropWidth=e.CropHeight=null;});}
-  public void EditImage(Element e) {EndEditing();Record();if(PropertyDialog.ImageEdit(this,e)){Model.SchemaVersion=3;Render();Record();MarkDirty();}}
+  public void RestoreImage(Element e) {if(e.Locked)return;Edit(delegate {e.ImageOpacity=null;e.CropX=e.CropY=e.CropWidth=e.CropHeight=null;});}
+  public void EditImage(Element e) {if(e.Locked)return;EndEditing();Record();if(PropertyDialog.ImageEdit(this,e)){Model.SchemaVersion=Math.Max(3,Model.SchemaVersion);Render();Record();MarkDirty();}}
  }
 }

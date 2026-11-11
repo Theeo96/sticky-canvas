@@ -36,6 +36,7 @@ namespace StickyCanvas
         [DataMember] public double StrokeWidth = 0, Padding = 6;
         [DataMember] public string AssetId = "";
         [DataMember(EmitDefaultValue = false)] public string GroupId;
+        [DataMember(EmitDefaultValue = false)] public bool Locked, IsDrawing;
         [DataMember(EmitDefaultValue = false)] public double? ImageOpacity;
         [DataMember(EmitDefaultValue = false)] public double? CropX, CropY, CropWidth, CropHeight;
         [DataMember] public bool ReverseLine;
@@ -75,7 +76,7 @@ namespace StickyCanvas
         [DataMember] public double BasicPanX=200, BasicPanY=200, FlowPanX=200, FlowPanY=200;
         [DataMember] public bool BasicFit;
         [DataMember(EmitDefaultValue = false)] public string HoverUi, PenColor;
-        [DataMember] public double PenWidth;
+        [DataMember] public double PenWidth, EraserWidth;
     }
     [DataContract] public class Asset
     {
@@ -113,7 +114,7 @@ namespace StickyCanvas
         public static void Require(bool ok, string message) { if (!ok) throw new InvalidDataException(message); }
         public static void Validate(Note n)
         {
-            Require(n != null && (n.SchemaVersion == 1 || n.SchemaVersion == 2 || n.SchemaVersion == 3), "지원하지 않는 문서 버전입니다. 원본은 보존됩니다.");
+            Require(n != null && (n.SchemaVersion == 1 || n.SchemaVersion == 2 || n.SchemaVersion == 3 || n.SchemaVersion == 4), "지원하지 않는 문서 버전입니다. 원본은 보존됩니다.");
             Require(Id(n.Id) && n.Title != null && n.Title.Length <= 500 && Color(n.Background), "메모의 기본 정보가 올바르지 않습니다.");
             Require(Number(n.PaperWidth, 120, 8192) && Number(n.PaperHeight, 120, 8192), "종이 크기가 올바르지 않습니다.");
             Require(n.Elements != null && n.Elements.Count <= 1000, "메모 요소 개수 한도를 초과했습니다.");
@@ -130,6 +131,8 @@ namespace StickyCanvas
                     foreach (var point in e.Points) Require(point != null && Number(point.X, 0, 1) && Number(point.Y, 0, 1), "필기 좌표가 올바르지 않습니다.");
                 }
                 Require(n.SchemaVersion >= 3 || (e.GroupId == null && !e.ImageOpacity.HasValue && !e.CropX.HasValue), "새 기능 문서는 버전 3이어야 합니다.");
+                Require(n.SchemaVersion >= 4 || (!e.Locked && !e.IsDrawing), "새 편집 기능은 문서 버전 4가 필요합니다.");
+                Require(!e.IsDrawing || e.Type == "image", "픽셀 필기 형식 오류");
                 Require(e.GroupId == null || Id(e.GroupId), "그룹 ID 오류");
                 Require(!e.ImageOpacity.HasValue || Number(e.ImageOpacity.Value, 0, 1), "이미지 투명도 오류");
                 if (e.CropX.HasValue || e.CropY.HasValue || e.CropWidth.HasValue || e.CropHeight.HasValue) {
@@ -166,7 +169,7 @@ namespace StickyCanvas
             Require(v != null && Number(v.Left, -100000, 100000) && Number(v.Top, -100000, 100000) && Number(v.Width, 300, 12000) && Number(v.Height, 240, 12000) && Number(v.Zoom, .1, 4), "창 설정이 올바르지 않습니다.");
             foreach(double value in new[]{v.PanX,v.PanY,v.BasicPanX,v.BasicPanY,v.FlowPanX,v.FlowPanY}) Require(Number(value,0,100000), "화면 이동 값 오류");
             Require(Number(v.BasicZoom,0,4) && Number(v.FlowZoom,0,4), "모드 배율 오류");
-            Require((v.HoverUi == null || v.HoverUi == "on" || v.HoverUi == "off") && (v.PenColor == null || Color(v.PenColor)) && Number(v.PenWidth, 0, 16), "보기/펜 설정이 올바르지 않습니다.");
+            Require((v.HoverUi == null || v.HoverUi == "on" || v.HoverUi == "off") && (v.PenColor == null || Color(v.PenColor)) && Number(v.PenWidth, 0, 64) && Number(v.EraserWidth, 0, 128), "보기/펜 설정이 올바르지 않습니다.");
         }
     }
     public sealed class History

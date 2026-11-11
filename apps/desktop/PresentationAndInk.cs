@@ -59,22 +59,20 @@ namespace StickyCanvas
         }
         void BuildInkTools(WrapPanel toolbar)
         {
-            toolbar.Children.Add(UI.Button("선택", delegate { SetInkTool("select"); }, "요소 선택 / 그리기 종료 (Esc)"));
+            toolbar.Children.Add(UI.Button("↖ 선택", delegate { SetInkTool("select"); }, "요소 선택 / 그리기 종료 (Esc)"));
             toolbar.Children.Add(UI.Button("✎ 펜", delegate { SetInkTool("pen"); }, "마우스·펜으로 손그림"));
-            toolbar.Children.Add(UI.Button("지우개", delegate { SetInkTool("erase"); }, "펜 선 전체 지우기 — 글·사진·도형은 유지"));
-            toolbar.Children.Add(UI.Button("펜 색", delegate { PickColor(View.PenColor ?? "#FF3E392F", delegate(string c) { View.PenColor = c; ConfigureInkAttributes(); MarkDirty(false); }); }));
-            var size = new ComboBox { Width = 48, Margin = new Thickness(3), ToolTip = "펜 굵기" };
-            foreach (int n in new[] { 1, 2, 3, 5, 8, 12, 16 }) size.Items.Add(n);
-            size.SelectedItem = View.PenWidth > 0 ? (int)View.PenWidth : 3;
-            size.SelectionChanged += delegate { if (size.SelectedItem != null) { View.PenWidth = (int)size.SelectedItem; ConfigureInkAttributes(); MarkDirty(false); } };
-            toolbar.Children.Add(size);
-            Paper.PreviewMouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e) { if (inkTool == "erase") { EraseInkAt(e.GetPosition(Paper)); e.Handled = true; } };
-            Paper.PreviewMouseMove += delegate(object sender, MouseEventArgs e) { if (inkTool == "erase" && e.LeftButton == MouseButtonState.Pressed) { EraseInkAt(e.GetPosition(Paper)); e.Handled = true; } };
+            toolbar.Children.Add(UI.Button("▰ 지우개", delegate { SetInkTool("erase"); }, "픽셀 필기의 닿는 부분 지우기 — 글·사진·도형은 유지"));
+            toolbar.Children.Add(UI.Button("● 펜 색", delegate { PickColor(View.PenColor ?? "#FF3E392F", delegate(string c) { View.PenColor = c; ConfigureInkAttributes(); MarkDirty(false); }); }));
+            BuildBrushSliders(toolbar);
+            Paper.PreviewMouseLeftButtonDown += delegate(object sender, MouseButtonEventArgs e) { if (inkTool == "erase") { BeginPixelErase(); ErasePixelAt(e.GetPosition(Paper)); Paper.CaptureMouse(); e.Handled = true; } };
+            Paper.PreviewMouseMove += delegate(object sender, MouseEventArgs e) { if (inkTool == "erase" && e.LeftButton == MouseButtonState.Pressed) { ErasePixelAt(e.GetPosition(Paper)); e.Handled = true; } };
+            Paper.PreviewMouseLeftButtonUp += delegate(object sender, MouseButtonEventArgs e) { if (inkTool == "erase") {FinishPixelErase();Paper.ReleaseMouseCapture();e.Handled=true;} };
+            Paper.LostMouseCapture += delegate { FinishPixelErase(); };
         }
         public void SetInkTool(string tool)
         {
             if (tool != "select" && tool != "pen" && tool != "erase") throw new ArgumentException("Unknown tool");
-            EndEditing(); Select(null); inkTool = tool; ConfigureInkOverlay(); RefreshChrome();
+            FinishPixelErase(); EndEditing(); Select(null); inkTool = tool; ConfigureInkOverlay(); RefreshChrome();
             Paper.Cursor = tool == "select" ? Cursors.Arrow : Cursors.Pen;
         }
         void ExitInkForObjectAction() { if (inkTool != "select") SetInkTool("select"); }
@@ -97,21 +95,21 @@ namespace StickyCanvas
         public void CommitInk(Stroke stroke)
         {
             var element = InkDrawing.FromStroke(stroke, Model.PaperWidth, Model.PaperHeight);
-            Edit(delegate { Model.SchemaVersion = Math.Max(2,Model.SchemaVersion); Model.Elements.Add(element); });
+            RasterizeDrawing(element);
+            Edit(delegate { Model.SchemaVersion = Math.Max(4,Model.SchemaVersion); Model.Elements.Add(element); });
         }
         public bool EraseInkAt(Point point)
         {
-            var hit = Model.Elements.AsEnumerable().Reverse().FirstOrDefault(e => e.Type == "stroke" && InkDrawing.ToStroke(e, e.Width, e.Height).HitTest(new Point(point.X - e.X, point.Y - e.Y), Math.Max(8, e.StrokeWidth + 4)));
-            if (hit == null) return false;
-            Edit(delegate { Model.Elements.RemoveAll(e => e.Id == hit.Id); }); return true;
+            BeginPixelErase();bool changed=ErasePixelAt(point);FinishPixelErase();return changed;
         }
+
     }
     public static class InkDrawing
     {
         public static Element FromStroke(Stroke stroke, double paperWidth, double paperHeight)
         {
             var points = stroke.StylusPoints; if (points.Count == 0) throw new ArgumentException("빈 선입니다.");
-            double thickness = Math.Max(1, Math.Min(16, stroke.DrawingAttributes.Width)), pad = thickness / 2;
+            double thickness = Math.Max(1, Math.Min(64, stroke.DrawingAttributes.Width)), pad = thickness / 2;
             int stride = Math.Max(1, (int)Math.Ceiling(points.Count / 19999.0));
             var sampled = new List<Point>();
             for (int i = 0; i < points.Count; i += stride) sampled.Add(new Point(Math.Max(pad, Math.Min(paperWidth - pad, points[i].X)), Math.Max(pad, Math.Min(paperHeight - pad, points[i].Y))));

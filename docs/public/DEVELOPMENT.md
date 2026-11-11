@@ -21,3 +21,6 @@ UI 도구가 도구 창을 찾지 못하면 `--profile <별도 경로> --ui-test
 `scripts/package.ps1`는 버전 폴더와 `release/current`를 갱신합니다. 앱을 먼저 정상 종료해야 하며 실사용 프로세스를 강제 종료하지 마세요.
 
 공개 전 `scripts/check-public-files.ps1`와 staged diff를 확인하세요. 개인 운영 문서는 `docs/public` 밖에 보관합니다. 별도의 이용 허락 라이선스는 아직 지정하지 않았습니다.
+
+
+SelectionTransforms.cs는 전체 선택 프레임·비율 변형·간격·잠금을, PixelDrawing.cs는 투명 PNG 필기·부분 지우기·브러시 슬라이더를 담당합니다. 지우기 중 픽셀 버퍼를 재사용하고 제스처 종료 시 첨부를 저장합니다. 저장 전에도 진행 중 제스처를 마무리합니다.
