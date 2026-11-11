@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -121,13 +121,14 @@ namespace StickyCanvas
                 finally { if (File.Exists(temp)) File.Delete(temp); }
             }
         }
+        public int BitmapDecodeCount {get;private set;}
+        public long BitmapCacheBytes {get{return 0;}}
         public BitmapSource Bitmap(string id, int maxWidth = 1600)
         {
             var a = GetAsset(id); if (a == null) throw new FileNotFoundException("첨부 정보를 찾을 수 없습니다.");
-            using (var input = File.OpenRead(AssetPath(a)))
-            {
-                var b = new BitmapImage(); b.BeginInit(); b.CacheOption = BitmapCacheOption.OnLoad;
-                b.DecodePixelWidth = Math.Min(maxWidth, a.PixelWidth); b.StreamSource = input; b.EndInit(); b.Freeze(); return b;
+            using (var input = File.OpenRead(AssetPath(a))) {
+                var bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.DecodePixelWidth = Math.Min(maxWidth, a.PixelWidth); bitmap.StreamSource = input; bitmap.EndInit(); bitmap.Freeze();BitmapDecodeCount++;return bitmap;
             }
         }
         public void Export(string path, List<Note> liveSnapshot = null)
@@ -245,6 +246,6 @@ namespace StickyCanvas
                 foreach (var old in Directory.GetFiles(dir, "recovery-????-??-??.sqlite3").OrderByDescending(p => p).Skip(7)) File.Delete(old);
             }
         }
-        public void Dispose() { lock (gate) db.Dispose(); }
+        public void Dispose() { lock(gate) db.Dispose(); }
     }
 }

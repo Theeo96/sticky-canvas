@@ -73,12 +73,13 @@ namespace StickyCanvas
             InitializeNavigation();
             scroll.HorizontalContentAlignment = HorizontalAlignment.Left; scroll.VerticalContentAlignment = VerticalAlignment.Top;
             InitializePresentation(outer, dock, header);
+            InitializeImageEditing(outer);
             Paper.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e) { if (e.OriginalSource == Paper) { EndEditing(); Select(null); Paper.Focus(); } };
             Paper.Focusable = true; scroll.SizeChanged += delegate { ApplyZoom(); zoomButton.Content = View.Fit ? "전체 맞춤" : Math.Round(View.Zoom * 100) + "%"; };
             AllowDrop = true;
             DragOver += delegate(object s, DragEventArgs e) { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
             Drop += delegate(object s, DragEventArgs e) { var files = e.Data.GetData(DataFormats.FileDrop) as string[]; if (files != null) foreach (var file in files.Take(10)) ImportImage(file); e.Handled = true; };
-            saveTimer.Tick += delegate { if(eraseBuffers!=null || transformGesture)return; if ((DateTime.UtcNow - lastChange).TotalMilliseconds >= 280 || (DateTime.UtcNow - firstChange).TotalMilliseconds >= 1000) Flush(false); };
+            saveTimer.Tick += delegate { if(ImageEditing || eraseBuffers!=null || transformGesture)return; if ((DateTime.UtcNow - lastChange).TotalMilliseconds >= 280 || (DateTime.UtcNow - firstChange).TotalMilliseconds >= 1000) Flush(false); };
             LocationChanged += delegate { if (!loading) MarkDirty(false); }; SizeChanged += delegate { if (!loading) MarkDirty(false); };
             Closing += delegate(object s, System.ComponentModel.CancelEventArgs e) {
                 if (App.Quitting || trashed) return;
@@ -151,6 +152,7 @@ namespace StickyCanvas
         }
         public void Render()
         {
+            FinishImageEdit(false);
             string selected = Selected == null ? null : Selected.Model.Id;
             ActiveText = null; Selected = null; Paper.Children.Clear(); views.Clear();
             Paper.Width = Model.PaperWidth; Paper.Height = Model.PaperHeight; Paper.Background = UI.Brush(Model.Background);
@@ -187,11 +189,11 @@ namespace StickyCanvas
         {
             if (loading || App.Quitting || trashed) return;
             if (!dirty) firstChange = DateTime.UtcNow; lastChange = DateTime.UtcNow; dirty = true; contentDirty |= content;
-            status.Content = "저장 중…"; status.Foreground = ChromeForeground; saveTimer.Start();
+            status.Content = "저장 중…"; status.Foreground = ChromeForeground; if(!ImageEditing)saveTimer.Start();
         }
         public bool Flush(bool alert)
         {
-            FinishPixelErase(); saveTimer.Stop(); if (trashed) return true;
+            FinishImageEdit(true); FinishPixelErase(); saveTimer.Stop(); if (trashed) return true;
             if (ActiveText != null) ActiveText.Capture();
             if (!dirty) return true;
             long rev = Model.Revision; string updated = Model.UpdatedAt;
@@ -290,6 +292,7 @@ namespace StickyCanvas
         }
         public void Undo()
         {
+            if(ImageEditing){FinishImageEdit(false);return;}
             EndEditing(); var previous = history.Undo(Model); if (previous == null) return;
             previous.Revision = Model.Revision; Model = previous; App.Replace(Model); Render(); MarkDirty();
         }
@@ -350,7 +353,8 @@ namespace StickyCanvas
                 File.WriteAllText(Path.Combine(App.Store.Root, "key-diagnostics.txt"), details);
             }));
             if (composing || e.Key == Key.ImeProcessed) return;
-            bool ordinaryInput = Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is ComboBox;
+            var focusedBox=Keyboard.FocusedElement as TextBox;
+            bool ordinaryInput = (focusedBox!=null && !focusedBox.IsReadOnly) || Keyboard.FocusedElement is ComboBox || Keyboard.FocusedElement is Slider;
             if (ctrl && e.Key == Key.N) { App.NewNote(); e.Handled = true; }
             else if (ctrl && shift && e.Key == Key.M) { App.ShowLibrary(); e.Handled = true; }
             else if (ctrl && e.Key == Key.S) { Flush(true); e.Handled = true; }

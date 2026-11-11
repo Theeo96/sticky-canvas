@@ -33,7 +33,8 @@ namespace StickyCanvas
             add("맨 앞으로", delegate { owner.Reorder(10000); }); add("맨 뒤로", delegate { owner.Reorder(-10000); });
             add("복제", owner.Duplicate); add("삭제", owner.Delete);
             if (Model.Type == "image") {
-                add("이미지 투명도·자르기…", delegate { owner.EditImage(Model); });
+                add("◐ 이미지 불투명도", delegate { owner.BeginImageOpacity(Model); });
+                add("⌗ 이미지 자르기", delegate { owner.BeginImageCrop(Model); });
                 add("이미지 원상복구", delegate { owner.RestoreImage(Model); });
             }
             if (Model.Type == "text") add("내용에 맞춰 높이 늘리기", owner.FitTextHeight);
@@ -46,7 +47,10 @@ namespace StickyCanvas
                 }
             }
             owner.TrackMenu(menu); ContextMenu = menu;
+
         }
+        public void PreviewOpacity(double value) {foreach(var image in body.Children.OfType<Image>())image.Opacity=value;}
+        public double DisplayedOpacity {get {var image=body.Children.OfType<Image>().FirstOrDefault();return image==null?1:image.Opacity;}}
         public void ShowPixelPreview(System.Windows.Media.Imaging.BitmapSource source) {body.Children.Clear();body.Children.Add(new Image{Source=source,Stretch=Stretch.Fill,IsHitTestVisible=false});}
         public void Layout()
         {

@@ -261,6 +261,36 @@ namespace StickyCanvas
                         var bitmap=window.App.Store.Bitmap(asset,8192);var data=new byte[bitmap.PixelWidth*bitmap.PixelHeight*4];var rgba=new System.Windows.Media.Imaging.FormatConvertedBitmap(bitmap,PixelFormats.Pbgra32,null,0);rgba.CopyPixels(data,bitmap.PixelWidth*4,0);
                         Assert(data.Where((v,i)=>i%4==3).Any(v=>v==0)&&data.Where((v,i)=>i%4==3).Any(v=>v>0),"Partial erase did not preserve visible pixels");
                     });
+                    test("live opacity preview is allocation-light, cancellable and one undo step",delegate {
+                        window.ImportImage(Path.Combine(root,"editor-fixture.png"));var image=window.Selected.Model;string before=Json.Write(window.Model);
+                        window.BeginImageOpacity(image);int decodes=app.Store.BitmapDecodeCount;
+                        for(int i=0;i<200;i++)window.PreviewImageOpacity((i%100)/100.0);
+                        Assert(app.Store.BitmapDecodeCount==decodes,"Opacity preview decoded images repeatedly");
+                        Assert(window.Paper.Children.OfType<ElementView>().First(v=>v.Model.Id==image.Id).DisplayedOpacity==.99,"Preview not visible on placed image");
+                        Assert(Json.Write(window.Model)==before,"Preview changed document before commit");window.FinishImageEdit(false);Assert(Json.Write(window.Model)==before,"Cancel changed document");
+                        window.BeginImageOpacity(image);window.PreviewImageOpacity(.25);window.FinishImageEdit(true);Assert(image.ImageOpacity==.25,"Opacity commit");
+                        window.Undo();Assert(!window.Model.Elements.First(e=>e.Id==image.Id).ImageOpacity.HasValue,"Undo opacity");window.Redo();Assert(window.Model.Elements.First(e=>e.Id==image.Id).ImageOpacity==.25,"Redo opacity");
+                        Assert(app.Store.BitmapCacheBytes<=32L*1024*1024,"Cache over budget");
+                    });
+                    test("image editing survives autosave delay and Escape cancels preview",delegate {
+                        var image=window.Model.Elements.Last(e=>e.Type=="image"&&!e.Locked);string before=Json.Write(window.Model);
+                        window.MarkDirty(false);window.BeginImageOpacity(image);window.PreviewImageOpacity(.12);
+                        var frame=new System.Windows.Threading.DispatcherFrame();var timer=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(1200)};timer.Tick+=delegate{timer.Stop();frame.Continue=false;};timer.Start();System.Windows.Threading.Dispatcher.PushFrame(frame);
+                        Assert(window.ImageEditing && Json.Write(window.Model)==before,"Autosave finalized draft");
+                        var args=new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,System.Windows.PresentationSource.FromVisual(window),0,System.Windows.Input.Key.Escape){RoutedEvent=UIElement.PreviewKeyDownEvent};window.RaiseEvent(args);
+                        Assert(!window.ImageEditing && Json.Write(window.Model)==before,"Escape did not cancel draft");
+                    });
+                    test("graphical crop composes coordinates, cancels, commits and saves",delegate {
+                        var image=window.Model.Elements.Last(e=>e.Type=="image"&&!e.Locked);string id=image.Id,asset=image.AssetId;
+                        window.BeginImageCrop(image);var before=window.PendingCrop;window.SetCropRectangle(new Rect(before.X+before.Width*.1,before.Y+before.Height*.1,before.Width*.7,before.Height*.7));window.FinishImageEdit(false);
+                        Assert(image.AssetId==asset&&!image.CropX.HasValue,"Crop cancel changed content");
+                        window.BeginImageCrop(image);before=window.PendingCrop;window.SetCropRectangle(new Rect(before.X+before.Width*.1,before.Y+before.Height*.1,before.Width*.7,before.Height*.7));window.FinishImageEdit(true);
+                        Assert(image.CropX.HasValue&&Math.Abs(image.CropWidth.Value-.7)<.001&&image.AssetId==asset,"Graphical crop commit");Rules.Validate(window.Model);
+                        double originalCrop=image.CropWidth.Value;window.BeginImageCrop(image);before=window.PendingCrop;window.SetCropRectangle(new Rect(before.X+2,before.Y+2,before.Width-4,before.Height-4));window.FinishImageEdit(true);Assert(image.CropWidth<originalCrop,"Repeated crop did not compose original coordinates");
+                        window.Undo();Assert(Math.Abs(window.Model.Elements.First(e=>e.Id==id).CropWidth.Value-originalCrop)<.001,"Crop undo");
+                        image=window.Model.Elements.First(e=>e.Id==id);window.BeginImageOpacity(image);window.PreviewImageOpacity(.6);Assert(window.Flush(false)&&!window.ImageEditing,"Save did not finalize preview");Assert(app.Store.Load().First(n=>n.Id==window.Model.Id).Elements.First(e=>e.Id==id).ImageOpacity==.6,"Saved preview mismatch");
+                        window.Edit(delegate{image.Locked=true;});window.BeginImageCrop(image);Assert(!window.ImageEditing,"Locked image crop opened");
+                    });
                     window.Close();
                     Assert(app.Store.View(n.Id).IsOpen == false, "Close should hide persisted note"); Assert(app.Store.Load().Any(a => a.Id == n.Id), "Close deleted note");
                 }

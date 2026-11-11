@@ -5,13 +5,13 @@ if (-not $SkipCurrent) {
     $taskRunning = @(Get-Process StickyCanvas -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $taskRoot 'release\current\StickyCanvas.exe') })
     if ($taskRunning.Count) { throw 'Exit StickyCanvas through its tray menu before updating current, or use -SkipCurrent for a versioned package only.' }
 }
-$taskRelease = Join-Path $taskRoot 'release\0.6.0'
+$taskRelease = Join-Path $taskRoot 'release\0.7.0'
 New-Item -ItemType Directory -Path $taskRelease -Force | Out-Null
 foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config')) {
     Copy-Item -LiteralPath (Join-Path (Join-Path $taskRoot 'bin') $taskName) -Destination (Join-Path $taskRelease $taskName) -Force
 }
 $taskGuide = @'
-캔버스 메모 v0.6.0 — Windows x64
+캔버스 메모 v0.7.0 — Windows x64
 
 평소에는 내용과 좌상단 작은 ☰ 버튼만 보입니다.
 좌상단 ☰ 버튼을 누를 때마다 상단 도구를 표시/숨깁니다.
@@ -60,7 +60,8 @@ Flow: 고정 버튼 왼쪽에서 켜고 끕니다. Flow 휠 확대 / 기본 모�
 Flow에서는 창 확대·오른쪽/아래 요소 이동·펜 경계 접근 시 영역이 확장됩니다. 최대 8192×8192.
 Shift+클릭 / 빈 공간 드래그: 여러 요소 선택. 선택 ▾ 또는 Ctrl+G로 그룹, Ctrl+Shift+G로 해제.
 선택 손잡이 드래그 / 방향키로 묶음 이동. Ctrl+A 전체 선택 (글 편집 중에는 본문 선택).
-이미지 우클릭 → 이미지 투명도·자르기: 불투명도와 원본 기준 자르기 백분율, 미리보기·적용.
+이미지 우클릭 → 이미지 불투명도: 슬라이더로 실시간 확인. 적용/Enter/다른 곳 클릭으로 확정, Esc 취소.
+이미지 우클릭 → 이미지 자르기: 격자·테두리 손잡이 조절, 이미지 밖 더블클릭/Enter/적용으로 확정, Esc 취소.
 이미지 원상복구: 자르기·불투명도 초기화. 원본 파일과 배치 크기는 유지합니다.
 그룹·이미지 편집은 스키마 3, 픽셀 필기·잠금은 스키마 4입니다. 이전 버전으로 열지 마세요.
 
@@ -81,7 +82,7 @@ foreach ($taskName in @('StickyCanvas.exe','StickyCanvas.exe.config','사용안�
     Copy-Item -LiteralPath (Join-Path $taskRelease $taskName) -Destination (Join-Path $taskCurrent $taskName) -Force
 }
 }
-$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.6.0.zip'
+$taskZip = Join-Path $taskRoot 'release\StickyCanvas-Windows-x64-0.7.0.zip'
 Compress-Archive -LiteralPath @((Join-Path $taskRelease 'StickyCanvas.exe'),(Join-Path $taskRelease 'StickyCanvas.exe.config'),(Join-Path $taskRelease '사용안내.txt')) -DestinationPath $taskZip -Force
 Get-FileHash -LiteralPath (Join-Path $taskRelease 'StickyCanvas.exe') -Algorithm SHA256 | Select-Object Path,Hash
 Get-Item -LiteralPath $taskZip | Select-Object FullName,Length

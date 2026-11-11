@@ -114,7 +114,7 @@ namespace StickyCanvas {
     if(e.ChangedButton==MouseButton.Middle || (e.ChangedButton==MouseButton.Left && Keyboard.IsKeyDown(Key.Space) && ActiveText==null && !TitleEditing)) {
      panStart=e.GetPosition(scroll);panH=scroll.HorizontalOffset;panV=scroll.VerticalOffset;scroll.CaptureMouse();e.Handled=true;
     } else if(e.ChangedButton==MouseButton.Left && e.OriginalSource==Paper && inkTool=="select") {
-     EndEditing();boxStart=e.GetPosition(Paper);if((Keyboard.Modifiers&ModifierKeys.Shift)==0)selectedIds.Clear();
+     EndEditing();Paper.Focus();boxStart=e.GetPosition(Paper);if((Keyboard.Modifiers&ModifierKeys.Shift)==0)selectedIds.Clear();
      selectionBox=new Rectangle{Stroke=Brushes.SteelBlue,StrokeThickness=1,Fill=UI.Brush("#224C81B8"),IsHitTestVisible=false};Paper.Children.Add(selectionBox);scroll.CaptureMouse();e.Handled=true;
     }
    };
@@ -141,6 +141,6 @@ namespace StickyCanvas {
    var crop=new CroppedBitmap(source,new Int32Rect(x,y,w,h));crop.Freeze();return crop;
   }
   public void RestoreImage(Element e) {if(e.Locked)return;Edit(delegate {e.ImageOpacity=null;e.CropX=e.CropY=e.CropWidth=e.CropHeight=null;});}
-  public void EditImage(Element e) {if(e.Locked)return;EndEditing();Record();if(PropertyDialog.ImageEdit(this,e)){Model.SchemaVersion=Math.Max(3,Model.SchemaVersion);Render();Record();MarkDirty();}}
+
  }
 }
