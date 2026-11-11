@@ -36,7 +36,7 @@ namespace StickyCanvas
         public NoteWindow(MemoApp app, Note model, NoteView view)
         {
             App = app; Model = model; View = view; history = new History(model);
-            Title = "캔버스 메모 · " + model.Title; UI.Chrome(this); UI.Place(this, view.Left, view.Top, view.Width, view.Height); Topmost = view.AlwaysOnTop;
+            Title = "캔버스 메모 · " + model.Title; UI.Chrome(this); AllowsTransparency=true; Opacity=View.WindowOpacity??1; UI.Place(this, view.Left, view.Top, view.Width, view.Height); Topmost = view.AlwaysOnTop;
             var outer = new Grid();
             var dock = new DockPanel { LastChildFill = false };
             outer.Children.Add(scroll); outer.Children.Add(dock);
@@ -74,6 +74,7 @@ namespace StickyCanvas
             scroll.HorizontalContentAlignment = HorizontalAlignment.Left; scroll.VerticalContentAlignment = VerticalAlignment.Top;
             InitializePresentation(outer, dock, header);
             InitializeImageEditing(outer);
+            InitializeNoteOpacity(outer);
             Paper.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e) { if (e.OriginalSource == Paper) { EndEditing(); Select(null); Paper.Focus(); } };
             Paper.Focusable = true; scroll.SizeChanged += delegate { ApplyZoom(); zoomButton.Content = View.Fit ? "전체 맞춤" : Math.Round(View.Zoom * 100) + "%"; };
             AllowDrop = true;
@@ -328,17 +329,19 @@ namespace StickyCanvas
             add("새 메모", App.NewNote); add("메모 목록", App.ShowLibrary);
             add("도구 고정 표시: " + (View.UiPinned ? "켜짐" : "꺼짐"), delegate { SetUiPinned(!View.UiPinned); });
             add("Windows 로그인 시 자동 실행: " + (App.IsAutoStartEnabled ? "켜짐" : "꺼짐"), App.ToggleAutoStart);
+            add("◐ 메모 전체 불투명도…", ShowNoteOpacity);
             add("메모 배경색…", delegate { PickColor(Model.Background, c => Edit(delegate { Model.Background = c; })); });
             add("종이 크기 변경…", delegate { double w, h; if (PropertyDialog.PaperSize(this, Model.PaperWidth, Model.PaperHeight, out w, out h)) Edit(delegate { Model.PaperWidth = w; Model.PaperHeight = h; }); });
             add("100%로 보기", delegate { View.Fit = false; View.Zoom = 1; ApplyZoom(); MarkDirty(false); });
             add("종이 전체 맞춤", delegate { View.Fit = true; ApplyZoom(); MarkDirty(false); });
             var elements = new MenuItem { Header = "요소 선택 / 가려진 요소 찾기" };
-            foreach (var e in Model.Elements.AsEnumerable().Reverse())
+            foreach (var e in FindableElements.Reverse())
             {
                 string id = e.Id; string text = e.Type == "text" ? e.PlainText.Replace('\n', ' ') : e.Type;
                 var m = new MenuItem { Header = text.Length > 35 ? text.Substring(0, 35) + "…" : string.IsNullOrEmpty(text) ? "빈 글상자" : text };
-                m.Click += delegate { EndEditing(); if (views.ContainsKey(id)) Select(views[id]); }; elements.Items.Add(m);
+                m.Click += delegate { EndEditing(); if (views.ContainsKey(id)) {Select(views[id]);RevealSelection();} }; elements.Items.Add(m);
             }
+            if(elements.Items.Count==0)elements.Items.Add(new MenuItem{Header="펜 필기를 제외한 요소가 없습니다",IsEnabled=false});
             menu.Items.Add(elements);
             add("백업 내보내기…", App.Export); add("이 메모를 휴지통으로", delegate { App.Trash(Model); });
             TrackMenu(menu); menu.IsOpen = true;

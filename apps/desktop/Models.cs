@@ -70,6 +70,7 @@ namespace StickyCanvas
         [DataMember] public double Left = 100, Top = 100, Width = 540, Height = 460, Zoom = 1;
         [DataMember] public bool IsOpen = true, AlwaysOnTop, Fit;
         [DataMember] public bool UiPinned;
+        [DataMember(EmitDefaultValue=false)] public double? WindowOpacity;
         [DataMember] public bool SnapGrid;
         [DataMember] public bool Flow;
         [DataMember] public double PanX, PanY, BasicZoom = 1, FlowZoom;
@@ -167,6 +168,7 @@ namespace StickyCanvas
         public static void Validate(NoteView v)
         {
             Require(v != null && Number(v.Left, -100000, 100000) && Number(v.Top, -100000, 100000) && Number(v.Width, 300, 12000) && Number(v.Height, 240, 12000) && Number(v.Zoom, .1, 4), "창 설정이 올바르지 않습니다.");
+            Require(!v.WindowOpacity.HasValue || Number(v.WindowOpacity.Value,.2,1), "메모 불투명도는 20~100% 범위여야 합니다.");
             foreach(double value in new[]{v.PanX,v.PanY,v.BasicPanX,v.BasicPanY,v.FlowPanX,v.FlowPanY}) Require(Number(value,0,100000), "화면 이동 값 오류");
             Require(Number(v.BasicZoom,0,4) && Number(v.FlowZoom,0,4), "모드 배율 오류");
             Require((v.HoverUi == null || v.HoverUi == "on" || v.HoverUi == "off") && (v.PenColor == null || Color(v.PenColor)) && Number(v.PenWidth, 0, 64) && Number(v.EraserWidth, 0, 128), "보기/펜 설정이 올바르지 않습니다.");

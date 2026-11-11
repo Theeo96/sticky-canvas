@@ -43,7 +43,7 @@ namespace StickyCanvas {
   }
   bool StartImageEdit(Element e,bool crop) {
    if(e==null||e.Type!="image"||e.Locked)return false;
-   FinishImageEdit(true);SetInkTool("select");EndEditing();
+   CloseNoteOpacity();FinishImageEdit(true);SetInkTool("select");EndEditing();
    if(views.ContainsKey(e.Id)){Select(views[e.Id]);RevealSelection();}
    imageOriginal=Json.Copy(e);imageTarget=e;cropMode=crop;pendingOpacity=e.ImageOpacity??1;
    selectedIds.Clear();Selected=null;RefreshMultiSelection();

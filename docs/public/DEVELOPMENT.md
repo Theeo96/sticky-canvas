@@ -30,3 +30,6 @@ ImageEditing.cs는 인라인 불투명도 미리보기와 원본 기준 그래�
 
 
 PenColor.cs는 펜 색상 견본과 메모 내부 색 추출을 담당합니다. 클릭 시 VisualBrush로 선택 장식을 숨긴 메모 영역의 지정 픽셀을 1×1 RenderTargetBitmap에 렌더링합니다. 확대율과 무관한 문서 좌표를 사용합니다. 화면 전체 캡처나 반복 타이머는 사용하지 않습니다.
+
+
+NoteAppearance.cs는 펜 필기를 제외한 찾기 목록과 창 전체 불투명도를 관리합니다. WPF AllowsTransparency와 Window.Opacity를 사용하며 소스 초기화 전에 투명 창 옵션을 설정합니다. 본문 데이터와 창 보기 설정을 구분합니다.

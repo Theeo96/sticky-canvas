@@ -306,6 +306,22 @@ namespace StickyCanvas
                         window.ZoomAt(.7,new Point(100,100));Assert(window.SamplePaperColor(new Point(225,225))==color,"Zoom changed sample");
                         string before=Json.Write(window.Model);window.SetInkTool("pick");window.PickPenColorAt(new Point(225,225));Assert(window.InkTool=="pen"&&window.SwatchColor==color,"Picker did not return to colored pen");Assert(Json.Write(window.Model)==before,"Picking added a stroke");window.SetInkTool("select");
                     });
+                    test("hidden element finder excludes legacy strokes and pixel drawings without removing content",delegate {
+                        var regular=window.Model.Elements.First(e=>e.Type=="image");var drawing=Json.Copy(regular);drawing.Id=Guid.NewGuid().ToString("N");drawing.IsDrawing=true;
+                        var points=new System.Windows.Input.StylusPointCollection(new[]{new System.Windows.Input.StylusPoint(50,50),new System.Windows.Input.StylusPoint(100,80)});
+                        var legacy=InkDrawing.FromStroke(new System.Windows.Ink.Stroke(points),window.Model.PaperWidth,window.Model.PaperHeight);
+                        window.Edit(delegate{window.Model.SchemaVersion=4;window.Model.Elements.Add(drawing);window.Model.Elements.Add(legacy);});string before=Json.Write(window.Model);
+                        Assert(!window.FindableElements.Any(e=>e.Type=="stroke"||e.IsDrawing),"Finder lists pen artwork");Assert(window.FindableElements.Any(e=>e.Id==regular.Id),"Finder hid ordinary image");Assert(Json.Write(window.Model)==before,"Filtering changed content");
+                    });
+                    test("whole note opacity persists and restores without changing document",delegate {
+                        window.Flush(false);var handle=new WindowInteropHelper(window).Handle;long style=Native.GetWindowLong(handle,-20).ToInt64();string before=Json.Write(window.Model);
+                        window.SetNoteOpacity(.5);Assert(window.AllowsTransparency && window.Opacity==.5,"Native window alpha not applied");Assert((Native.GetWindowLong(handle,-20).ToInt64()&~0x80000L)==(style&~0x80000L),"Other window flags changed");window.Flush(false);
+                        Assert(app.Store.View(window.Model.Id).WindowOpacity==.5,"Window opacity not saved");
+                        var reopened=new NoteWindow(app,window.Model,app.Store.View(window.Model.Id)){ShowActivated=false};reopened.Show();reopened.UpdateLayout();Assert(reopened.AllowsTransparency && reopened.Opacity==.5,"Opacity not restored on new HWND");reopened.Close();
+                        window.SetNoteOpacity(1);Assert(window.Opacity==1,"Opaque mode did not restore");Assert(Json.Write(window.Model)==before,"Window alpha edited document");
+                        bool rejected=false;try{window.SetNoteOpacity(0);}catch{rejected=true;}Assert(rejected,"Invisible window allowed");
+                        var old=Json.Read<NoteView>("{\"Left\":100,\"Top\":100,\"Width\":540,\"Height\":460,\"Zoom\":1}");Assert(!old.WindowOpacity.HasValue,"Legacy default opacity");Rules.Validate(old);
+                    });
                     window.Close();
                     Assert(app.Store.View(n.Id).IsOpen == false, "Close should hide persisted note"); Assert(app.Store.Load().Any(a => a.Id == n.Id), "Close deleted note");
                 }
