@@ -36,3 +36,6 @@ NoteAppearance.cs는 펜 필기를 제외한 찾기 목록과 창 전체 불투�
 
 
 PenPointer.cs는 메모 밖의 루트 오버레이에 펜 실제 크기·위치 원을 그립니다. InkCanvas 기본 커서는 UseCustomCursor/Cursors.None으로 비활성화하며, 오버레이는 입력을 받지 않습니다. PenPointerDiameter는 문서 굵기×배율(DIP)이고 Locator는 최소20DIP입니다. 스포이드 캡처 대상인 Paper의 자식이 아닙니다.
+
+
+v0.8: Store.Bitmap은 내용 해시/디코딩 너비 기준32MiB LRU 캐시를 사용합니다. 작은 디코딩 결과는 독립 Pbgra32 픽셀로 물질화해 디코더를 유지하지 않습니다. ElementView.ReuseImage는 원본·자르기·필기 플래그가 같은 이미지 객체를 재사용하며 모델 참조를 갱신합니다. 마지막 메모 창 닫기와 Store.Dispose에서 캐시를 비웁니다. scripts/test-image-resources.ps1은 독립 실행기에 의한 인공 부하 도구입니다.

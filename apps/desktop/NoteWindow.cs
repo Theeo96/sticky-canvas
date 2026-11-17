@@ -88,7 +88,7 @@ namespace StickyCanvas
                 bool before = View.IsOpen; View.IsOpen = false;
                 try { App.Store.Save(Model, View); } catch (Exception ex) { View.IsOpen = before; e.Cancel = true; MemoApp.Error(ex); }
             };
-            Closed += delegate { saveTimer.Stop(); ActiveText = null; views.Clear(); Paper.Children.Clear(); };
+            Closed += delegate { saveTimer.Stop(); ActiveText = null; foreach(var v in views.Values)v.ReleaseImageResources();views.Clear(); Paper.Children.Clear(); };
             PreviewKeyDown += Keys;
             if (app.UiTestMode) PreviewMouseDown += delegate(object sender, MouseButtonEventArgs e) {
                 var point = e.GetPosition(this); var hit = InputHitTest(point) as DependencyObject;
@@ -155,9 +155,19 @@ namespace StickyCanvas
         {
             FinishImageEdit(false);
             string selected = Selected == null ? null : Selected.Model.Id;
-            ActiveText = null; Selected = null; Paper.Children.Clear(); views.Clear();
+            ActiveText = null; Selected = null;
+            var previous=new Dictionary<string,ElementView>(views);views.Clear();
+            foreach(var child in Paper.Children.OfType<UIElement>().Where(c=>!(c is ElementView)).ToList())Paper.Children.Remove(child);
             Paper.Width = Model.PaperWidth; Paper.Height = Model.PaperHeight; Paper.Background = UI.Brush(Model.Background);
-            foreach (var e in Model.Elements) { var v = new ElementView(this, e); views[e.Id] = v; Paper.Children.Add(v); if (e.Id == selected) Selected = v; }
+            int index=0;
+            foreach(var e in Model.Elements) {
+                ElementView v;
+                if(previous.TryGetValue(e.Id,out v)) {previous.Remove(e.Id);if(!v.ReuseImage(e)){Paper.Children.Remove(v);v.ReleaseImageResources();v=new ElementView(this,e);}}
+                else v=new ElementView(this,e);
+                if(Paper.Children.IndexOf(v)!=index){Paper.Children.Remove(v);Paper.Children.Insert(index,v);}index++;
+                views[e.Id]=v;if(e.Id==selected)Selected=v;
+            }
+            foreach(var v in previous.Values){Paper.Children.Remove(v);v.ReleaseImageResources();}
             RefreshMultiSelection();
             bool before = loading; loading = true; title.Text = Model.Title; loading = before;
             Title = "캔버스 메모 · " + Model.Title; scroll.Background = Paper.Background; Background = Paper.Background;

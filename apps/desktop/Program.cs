@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -136,7 +136,7 @@ namespace StickyCanvas
             if (OpenWindows.TryGetValue(n.Id, out existing)) { existing.Show(); existing.Activate(); return; }
             var view = Store.View(n.Id); view.IsOpen = true;
             var w = new NoteWindow(this, n, view); OpenWindows[n.Id] = w;
-            w.Closed += delegate { OpenWindows.Remove(n.Id); if (MainWindow == w) MainWindow = null; };
+            w.Closed += delegate { OpenWindows.Remove(n.Id); if(OpenWindows.Count==0)Store.ClearBitmapCache(); if (MainWindow == w) MainWindow = null; };
             w.Show();
             if (edit) w.BeginDefaultEditing();
         }

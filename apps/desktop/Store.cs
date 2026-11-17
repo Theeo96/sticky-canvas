@@ -121,14 +121,32 @@ namespace StickyCanvas
                 finally { if (File.Exists(temp)) File.Delete(temp); }
             }
         }
+        sealed class BitmapEntry { public BitmapSource Source;public long Bytes,Used; }
+        readonly Dictionary<string,BitmapEntry> bitmapCache=new Dictionary<string,BitmapEntry>();
+        long bitmapBytes,bitmapClock;
         public int BitmapDecodeCount {get;private set;}
-        public long BitmapCacheBytes {get{return 0;}}
+        public long BitmapCacheBytes {get{lock(gate)return bitmapBytes;}}
+        public void ClearBitmapCache(){lock(gate){bitmapCache.Clear();bitmapBytes=0;}}
         public BitmapSource Bitmap(string id, int maxWidth = 1600)
         {
-            var a = GetAsset(id); if (a == null) throw new FileNotFoundException("첨부 정보를 찾을 수 없습니다.");
-            using (var input = File.OpenRead(AssetPath(a))) {
-                var bitmap = new BitmapImage(); bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.DecodePixelWidth = Math.Min(maxWidth, a.PixelWidth); bitmap.StreamSource = input; bitmap.EndInit(); bitmap.Freeze();BitmapDecodeCount++;return bitmap;
+            lock(gate) {
+                string key=id+":"+maxWidth;BitmapEntry entry;
+                if(bitmapCache.TryGetValue(key,out entry)){entry.Used=++bitmapClock;return entry.Source;}
+                var a=GetAsset(id);if(a==null)throw new FileNotFoundException("첨부 정보를 찾을 수 없습니다.");
+                BitmapSource source;
+                using(var input=File.OpenRead(AssetPath(a))) {
+                    var bitmap=new BitmapImage();bitmap.BeginInit();bitmap.CacheOption=BitmapCacheOption.OnLoad;bitmap.DecodePixelWidth=Math.Min(maxWidth,a.PixelWidth);bitmap.StreamSource=input;bitmap.EndInit();bitmap.Freeze();source=bitmap;
+                }
+                BitmapDecodeCount++;long bytes=(long)source.PixelWidth*source.PixelHeight*4;
+                const long budget=32L*1024*1024;
+                if(bytes<=budget) {
+                    // Materialize just the decoded pixels; do not retain the JPEG decoder/stream.
+                    var pixels=new byte[(int)bytes];var converted=new System.Windows.Media.Imaging.FormatConvertedBitmap(source,System.Windows.Media.PixelFormats.Pbgra32,null,0);converted.CopyPixels(pixels,source.PixelWidth*4,0);
+                    source=BitmapSource.Create(source.PixelWidth,source.PixelHeight,96,96,System.Windows.Media.PixelFormats.Pbgra32,null,pixels,source.PixelWidth*4);source.Freeze();
+                    while(bitmapCache.Count>0&&(bitmapBytes+bytes>budget||bitmapCache.Count>=24)){var oldest=bitmapCache.OrderBy(p=>p.Value.Used).First();bitmapBytes-=oldest.Value.Bytes;bitmapCache.Remove(oldest.Key);}
+                    bitmapCache[key]=new BitmapEntry{Source=source,Bytes=bytes,Used=++bitmapClock};bitmapBytes+=bytes;
+                }
+                return source;
             }
         }
         public void Export(string path, List<Note> liveSnapshot = null)
@@ -246,6 +264,6 @@ namespace StickyCanvas
                 foreach (var old in Directory.GetFiles(dir, "recovery-????-??-??.sqlite3").OrderByDescending(p => p).Skip(7)) File.Delete(old);
             }
         }
-        public void Dispose() { lock(gate) db.Dispose(); }
+        public void Dispose() { lock(gate){ClearBitmapCache();db.Dispose();} }
     }
 }

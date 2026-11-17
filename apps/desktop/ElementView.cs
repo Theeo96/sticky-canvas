@@ -11,7 +11,8 @@ namespace StickyCanvas
 {
     public sealed class ElementView : Grid
     {
-        public readonly Element Model;
+        public Element Model {get;private set;}
+        string displayedAsset;double? displayedX,displayedY,displayedWidth,displayedHeight;bool displayedDrawing;
         readonly NoteWindow owner; readonly Grid body = new Grid(); readonly Grid handles = new Grid();
         public RichTextBox Editor { get; private set; }
         public ElementView(NoteWindow owner, Element model)
@@ -49,6 +50,12 @@ namespace StickyCanvas
             owner.TrackMenu(menu); ContextMenu = menu;
 
         }
+        public bool ReuseImage(Element next) {
+            var image=body.Children.OfType<Image>().FirstOrDefault();
+            if(Editor!=null||next.Type!="image"||image==null||displayedAsset!=next.AssetId||displayedX!=next.CropX||displayedY!=next.CropY||displayedWidth!=next.CropWidth||displayedHeight!=next.CropHeight||displayedDrawing!=next.IsDrawing)return false;
+            Model=next;image.Opacity=next.ImageOpacity??1;Layout();return true;
+        }
+        public void ReleaseImageResources(){foreach(var image in body.Children.OfType<Image>())image.Source=null;body.Children.Clear();handles.Children.Clear();Editor=null;}
         public void ShowSelectionHandles(bool show){handles.Visibility=show?Visibility.Visible:Visibility.Hidden;}
         public void PreviewOpacity(double value) {foreach(var image in body.Children.OfType<Image>())image.Opacity=value;}
         public double DisplayedOpacity {get {var image=body.Children.OfType<Image>().FirstOrDefault();return image==null?1:image.Opacity;}}
@@ -71,7 +78,7 @@ namespace StickyCanvas
             }
             else if (Model.Type == "image")
             {
-                try { body.Children.Add(new Image { Source = owner.ImageSource(Model), Opacity = Model.ImageOpacity ?? 1, Stretch = Model.IsDrawing ? Stretch.Fill : Stretch.Uniform, IsHitTestVisible = false }); }
+                try { displayedAsset=Model.AssetId;displayedX=Model.CropX;displayedY=Model.CropY;displayedWidth=Model.CropWidth;displayedHeight=Model.CropHeight;displayedDrawing=Model.IsDrawing;body.Children.Add(new Image { Source = owner.ImageSource(Model), Opacity = Model.ImageOpacity ?? 1, Stretch = Model.IsDrawing ? Stretch.Fill : Stretch.Uniform, IsHitTestVisible = false }); }
                 catch { body.Children.Add(new TextBlock { Text = "이미지를 읽을 수 없습니다\n원본 데이터는 보존됩니다", TextWrapping = TextWrapping.Wrap, Foreground = UI.Muted, Background = UI.Brush("#FFF3E7D2") }); }
                 Background = Brushes.Transparent;
             }

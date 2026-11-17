@@ -331,6 +331,21 @@ namespace StickyCanvas
                         window.ZoomAt(.125,new Point(150,150));window.View.PenWidth=1;Assert(window.PenPointerDiameter==1 && window.PenLocatorDiameter>=20,"One-pixel locator");window.SetInkTool("select");Assert(window.Paper.Cursor==System.Windows.Input.Cursors.Arrow,"Selection cursor not restored");
                         string before=Json.Write(window.Model);window.ToggleFlow();window.ToggleFlow();Assert(Json.Write(window.Model)==before,"Zoom changed note content");
                     });
+                    test("image view and decoded bitmap reuse survive opacity crop and undo",delegate {
+                        window.ImportImage(Path.Combine(root,"editor-fixture.png"));var image=window.Selected.Model;string id=image.Id;
+                        var originalView=window.Paper.Children.OfType<ElementView>().First(v=>v.Model.Id==id);int before=app.Store.BitmapDecodeCount;
+                        for(int i=0;i<12;i++){image=window.Model.Elements.First(e=>e.Id==id);window.BeginImageOpacity(image);window.PreviewImageOpacity(.4);window.FinishImageEdit(true);window.Undo();window.Redo();window.Undo();}
+                        Assert(ReferenceEquals(originalView,window.Paper.Children.OfType<ElementView>().First(v=>v.Model.Id==id)),"Unchanged image view rebuilt");Assert(app.Store.BitmapDecodeCount==before,"Unchanged images decoded again");
+                        var bitmap=app.Store.Bitmap(image.AssetId);Assert(ReferenceEquals(bitmap,app.Store.Bitmap(image.AssetId)),"Frozen source not shared");
+                        window.BeginImageCrop(window.Model.Elements.First(e=>e.Id==id));var r=window.PendingCrop;window.SetCropRectangle(new Rect(r.X+2,r.Y+2,r.Width-4,r.Height-4));window.FinishImageEdit(true);window.Undo();
+                        Assert(app.Store.BitmapDecodeCount==before,"Crop redecoded source");app.Store.ClearBitmapCache();Assert(app.Store.BitmapCacheBytes==0,"Cache did not clear");Assert(bitmap.PixelWidth>0,"Clearing cache invalidated live source");
+                        app.Store.Bitmap(image.AssetId);Assert(app.Store.BitmapDecodeCount==before+1,"Cleared entry not decoded");
+                    });
+                    test("bitmap cache enforces byte budget with immutable detached pixel sources",delegate {
+                        string folder=Path.Combine(root,"cache-fixtures");Directory.CreateDirectory(folder);var ids=new List<string>();
+                        for(int j=0;j<3;j++){var bytes=new byte[2048*2048*4];for(int i=0;i<bytes.Length;i+=4){bytes[i]=(byte)(40+j);bytes[i+3]=255;}var bitmap=BitmapSource.Create(2048,2048,96,96,PixelFormats.Bgra32,null,bytes,2048*4);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));string path=Path.Combine(folder,j+".png");using(var output=File.Create(path))encoder.Save(output);ids.Add(app.Store.ImportImage(path).Id);app.Store.Bitmap(ids.Last(),2048);Assert(app.Store.BitmapCacheBytes<=32L*1024*1024,"Cache exceeded budget");}
+                        int decodes=app.Store.BitmapDecodeCount;app.Store.Bitmap(ids[0],2048);Assert(app.Store.BitmapDecodeCount==decodes+1,"LRU did not evict oldest");app.Store.ClearBitmapCache();
+                    });
                     window.Close();
                     Assert(app.Store.View(n.Id).IsOpen == false, "Close should hide persisted note"); Assert(app.Store.Load().Any(a => a.Id == n.Id), "Close deleted note");
                 }
