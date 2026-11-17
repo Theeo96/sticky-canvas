@@ -28,3 +28,6 @@ v0.7.2의 WindowOpacity는 NoteView에 저장하는 nullable 배율(0.2~1)입니
 
 
 v0.7.3은 NoteView의 Zoom/BasicZoom/FlowZoom 상한을 8로 늘립니다. 400%까지 지원하던 구버전에서는 800% 보기 설정을 읽지 못해 보기 설정이 초기화될 수 있습니다. 문서 좌표·요소 크기에는 영향이 없습니다.
+
+
+웹 작업 파일 v1은 Notes(Document/BaseHash), Assets(Id/Mime/Data/Width/Height)를 포함합니다. 웹 변경 v1은 NoteId/BaseRevision/BaseHash/TextEdits(ElementId/Paragraphs)만 받습니다. 원본 이미지·위치·도형을 변경하는 필드는 계약에 없습니다. 내보내기 이후 수정/삭제 또는 해시 불일치가 있으면 전체 변경을 적용하지 않습니다. 읽기 검사와 쓰기는 같은 SQLite 트랜잭션에 둡니다. 현재는 파일 전달 기반이며 인증·실시간 동기화 프로토콜 완성을 의미하지 않습니다.

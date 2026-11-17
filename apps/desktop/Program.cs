@@ -114,6 +114,8 @@ namespace StickyCanvas
             menu.Items.Add("모든 메모 숨기기", null, delegate { foreach (var w in OpenWindows.Values.ToList()) w.Close(); });
             menu.Items.Add(new Forms.ToolStripSeparator());
             menu.Items.Add("백업 내보내기…", null, delegate { Export(); });
+            menu.Items.Add("웹 갤러리 작업 파일 내보내기…", null, delegate { ExportWebWorkspace(); });
+            menu.Items.Add("웹 갤러리 변경 가져오기…", null, delegate { ImportWebChanges(); });
             menu.Items.Add("백업 가져오기…", null, delegate { Import(); });
             menu.Items.Add("데이터 폴더 열기", null, delegate { Process.Start("explorer.exe", "\"" + Store.Root + "\""); });
             var auto = new Forms.ToolStripMenuItem("Windows 로그인 시 실행") { Checked = AutoStartEnabled() };
@@ -149,6 +151,14 @@ namespace StickyCanvas
             if (Quitting) return;
             if (library == null) { library = new LibraryWindow(this); library.Closed += delegate { if (MainWindow == library) MainWindow = null; library = null; }; }
             library.Refresh(); library.Show(); library.Activate();
+        }
+        public void ExportWebWorkspace() {
+            if(!FlushAll())return;var dialog=new Microsoft.Win32.SaveFileDialog{Title="웹 갤러리 작업 파일 내보내기",Filter="웹 작업 파일 (*.json)|*.json",FileName="sticky-canvas-workspace.json"};
+            if(dialog.ShowDialog()!=true)return;try{Store.ExportWebWorkspace(dialog.FileName);MessageBox.Show("내보낸 파일을 웹 갤러리에서 열 수 있습니다. 파일에는 메모와 이미지가 포함됩니다.","캔버스 메모");}catch(Exception ex){Error(ex);}
+        }
+        public void ImportWebChanges() {
+            if(!FlushAll())return;var dialog=new Microsoft.Win32.OpenFileDialog{Title="웹 갤러리 변경 가져오기",Filter="웹 변경 파일 (*.json)|*.json"};if(dialog.ShowDialog()!=true)return;
+            try{Rules.Require(new FileInfo(dialog.FileName).Length<=16*1024*1024,"변경 파일은16MiB까지 지원합니다.");var result=Store.ApplyWebChanges(Json.Read<WebChanges>(File.ReadAllText(dialog.FileName)));if(result.Conflicts.Count>0){MessageBox.Show("데스크톱에서 바뀌었거나 삭제된 메모가 있어 반영하지 않았습니다. 최신 작업 파일을 다시 내보내 주세요.","캔버스 메모");return;}foreach(var note in result.Applied){Replace(note);NoteWindow w;if(OpenWindows.TryGetValue(note.Id,out w))w.AcceptWebNote(note);}RefreshLibrary();MessageBox.Show(result.Applied.Count+"개 메모의 텍스트를 반영했습니다.","캔버스 메모");}catch(Exception ex){Error(ex);}
         }
         public void RefreshLibrary() { if (library != null) library.Refresh(); }
         public void Trash(Note note)

@@ -39,3 +39,6 @@ PenPointer.cs는 메모 밖의 루트 오버레이에 펜 실제 크기·위치 
 
 
 v0.8: Store.Bitmap은 내용 해시/디코딩 너비 기준32MiB LRU 캐시를 사용합니다. 작은 디코딩 결과는 독립 Pbgra32 픽셀로 물질화해 디코더를 유지하지 않습니다. ElementView.ReuseImage는 원본·자르기·필기 플래그가 같은 이미지 객체를 재사용하며 모델 참조를 갱신합니다. 마지막 메모 창 닫기와 Store.Dispose에서 캐시를 비웁니다. scripts/test-image-resources.ps1은 독립 실행기에 의한 인공 부하 도구입니다.
+
+
+DpiChecks.cs는 실제 모니터 배율 목록과 오프스크린 5개 DPI의 렌더링/좌표 왕복 검사를 분리해 보고합니다. WebWorkspace.cs는 웹 작업 파일·텍스트 변경 계약과 원자적 충돌 검사를 담당합니다. 원본 해시는 Note JSON의 SHA-256이며, 현재 리비전/해시가 둘 다 같아야 반영합니다. apps/web-preview는 외부 의존성·통신 없는 정적 뷰어/글 편집기입니다. 클라우드 API/인증 구현과 구분합니다.

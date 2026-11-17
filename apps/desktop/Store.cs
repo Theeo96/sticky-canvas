@@ -9,7 +9,7 @@ using System.Windows.Media.Imaging;
 
 namespace StickyCanvas
 {
-    public sealed class Store : IDisposable
+    public sealed partial class Store : IDisposable
     {
         readonly object gate = new object(); readonly Sqlite db;
         public readonly string Root;
